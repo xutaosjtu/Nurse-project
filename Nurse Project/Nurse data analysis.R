@@ -30,9 +30,43 @@ plotNurse = function(data, samples, id){
 	dev.off()
 }
 
-for(i in names(table(samples$SW_Nr))){
-	plotNurse(data,samples,i)
+plotNurse = function(data, samples, id){
+	index.person = match(samples$Proben_ID[which(samples$SW_Nr == id)], data$Sample.Identification)
+	pdf(paste("personal change over time ",id,".pdf", sep = "",collapse=""), width =20, height=15)
+	par(mfrow = c(5,5))
+	for(i in measures){
+		subset = as.logical(matrixLOD[index.person,i])
+		if(sum(subset)!=0)	{
+			plot(data[index.person[subset], i]~data[index.person[subset], "Probennahme_Uhr"], 
+					main = i, 
+					pch = c(19, 21)[samples$Schichtdienst[which(samples$SW_Nr == id)][subset]])
+			#points(data[index.person[subset], i], pch = 22, col = c("black")[samples$Morgenurin[which(samples$SW_Nr == id)][subset]])
+		}
+		else plot(0, main = i)
+	}
+	dev.off()
 }
+
+plotNurse(data.merged,samples,"SW1037")
+
+for(i in names(table(samples$SW_Nr))){
+	plotNurse(data.merged,samples,i)
+}
+
+
+pdf(paste("Change over time in all samples",id,".pdf", sep = "",collapse=""), width =20, height=15)
+	par(mfrow = c(5,5))
+	for(i in measures){
+		subset = as.logical(matrixLOD[,i])
+		if(sum(subset)!=0)	{
+			plot(data.merged[subset, i]~data.merged[subset, "Probennahme_Uhr"], #log = 'y',
+					main = i, 
+					pch = c(19, 21)[data.merged$Schichtdienst[subset]])
+			#points(data[index.person[subset], i], pch = 22, col = c("black")[samples$Morgenurin[which(samples$SW_Nr == id)][subset]])
+		}
+		else plot(0, main = i)
+	}
+	dev.off()
 
 
 ## differences between night shift and day shift work
