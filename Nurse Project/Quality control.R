@@ -6,8 +6,10 @@
 
 setwd("D:/Users/tao.xu/Dropbox/Nurse project/")
 
-data = read.csv("2013-04-10_Conc_Rui_Rabstein_Urin.csv")
-data= data[-c(1:),]
+data = read.csv("data/2013-04-10_Conc_Rui_Rabstein_Urin.csv")
+#data= data[-c(1:),]
+samples = read.csv("data/2013-01-31 Helmholtz.csv")
+#samples = samples[1:429,]
 
 ## overall CV and within plate CV
 index.ref = sapply(data$Sample.Identification, function(x) grep("Ref",x,fixed=T) )
@@ -37,17 +39,19 @@ dev.off()
 
 ## LOD
 aboveLOD = function(data){
+	## out: Logical indicator of above LOD
 	index.zero = (data$Sample.Type=="Zero Sample")
 	index.nurse = sapply(data$Sample.Identification, function(x) grep("SW",x,fixed=T) )
 	index.nurse = sapply(index.nurse, function(x) length(x)!=0)
 	
-	rst.overLOD=apply(data[,measures],2, function(x) 	x>3*median(x[index.zero])
+	rst.overLOD=apply(data[,measures],2, function(x) x>3*median(x[index.zero])
 	)
 	return(rst.overLOD)
 }
 
-		
+
 aboveLOD = function(data){
+	##out: total number of metabolites above LOD
 	index.zero = (data$Sample.Type=="Zero Sample")
 	index.nurse = sapply(data$Sample.Identification, function(x) grep("SW",x,fixed=T) )
 	index.nurse = sapply(index.nurse, function(x) length(x)!=0)
@@ -82,9 +86,6 @@ rst[,7]=rst[,7]/429
 write.csv(rst, file = "overLOD_nurse.csv")
 
 
-samples = read.csv("data/2013-01-31 Helmholtz.csv")
-samples = samples[1:429,]
-
 data.merged = merge(data,samples,by.x="Sample.Identification", by.y="Proben_ID")
 
 ## data Normalization
@@ -93,6 +94,12 @@ normalize<-function(data, measures){
 	data[,measures] = tmp
 	return(data)
 }
+
+##exclude abnormal creatinine data
+data.merged = data.merged[which(matrixLOD$Creatinine==1), ]
+matrixLOD = matrixLOD[which(matrixLOD$Creatinine==1),]
+
+data.merged = normalize(data.merged,measures)
 
 
 ##Spined and unspined samples

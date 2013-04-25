@@ -72,7 +72,7 @@ require(nlme)
 rst=NULL
 for(i in measures){
 	subset = as.logical(matrixLOD[,i])
-	if(sum(subset)>3&
+	if(sum(subset)>3& i!="Creatinine"&
 			table(data.merged$Schichtdienst[subset])[1]!=0&
 			table(data.merged$Schichtdienst[subset])[2]!=0
 	){
