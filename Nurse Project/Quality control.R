@@ -46,12 +46,6 @@ aboveLOD = function(data){
 	return(rst.overLOD)
 }
 
-rst=NULL; matrixLOD = data[,measures]
-for(i in names(table(data$Plate.Bar.Code))[2:7]){
-			subset = which(data$Plate.Bar.Code == i)
-			matrixLOD[subset,]=aboveLOD(data[subset,])
-}
-
 		
 aboveLOD = function(data){
 	index.zero = (data$Sample.Type=="Zero Sample")
@@ -62,6 +56,16 @@ aboveLOD = function(data){
 	)
 	return(rst.overLOD)
 }
+
+## levels above LOD of measurements
+matrixLOD = data[,measures]
+for(i in names(table(data$Plate.Bar.Code))[2:7]){
+	plate = which(data$Plate.Bar.Code == i)
+	matrixLOD[plate,]=aboveLOD(data[plate,])
+}
+matrixLOD = data.frame(matrixLOD, 
+		Sample.Identification=data$Sample.Identification)
+matrixLOD = merge(matrixLOD,samples, by.x = "Sample.Identification", by.y = "Proben_ID")
 
 rst=NULL
 for(i in names(table(data$Plate.Bar.Code))[2:7]){
@@ -78,9 +82,18 @@ rst[,7]=rst[,7]/429
 write.csv(rst, file = "overLOD_nurse.csv")
 
 
+samples = read.csv("data/2013-01-31 Helmholtz.csv")
+samples = samples[1:429,]
+
+data.merged = merge(data,samples,by.x="Sample.Identification", by.y="Proben_ID")
+
 ## data Normalization
-tmp = apply(data[,measures], 2, function(x) 1000*x/data$Creatinine)
-data[,measures] = tmp
+normalize<-function(data, measures){
+	tmp = apply(data[,measures], 2, function(x) 1000*x/data$Creatinine)
+	data[,measures] = tmp
+	return(data)
+}
+
 
 ##Spined and unspined samples
 index.spin = sapply(data$Sample.Identification, function(x) grep("PU",x,fixed=T) )
@@ -111,3 +124,26 @@ for(i in measures){
 }
 dev.off()
 #[2:8][c(-1,-9)]
+
+
+## Batch effects after normalization
+pdf("Metabolite levels in different plates_log.pdf", width = 25, height = 20)
+par(mfrow=c(5,5))
+for(i in measures){
+	subset = as.logical(matrixLOD[83:510,i])
+	if(sum(subset)!=0){
+		plot(data.merged[subset,i]~data.merged$Plate.Bar.Code[subset], log="y", main=i)
+	}
+	else plot(0)
+}
+dev.off()
+
+pdf("Metabolite levels of reference samples, internal standard and zero samples in different plates_log.pdf", width = 25, height = 20)
+par(mfrow=c(5,5))
+for(i in measures){
+	#subset = as.logical(matrixLOD[83:510,i])
+		plot(data[index.ref,i]~data$Plate.Bar.Code[index.ref], main=i, ylim = c(min(data[index.zero,i]),max(data[index.ref,i])))
+		lines(data$Plate.Bar.Code[index.standard],data[index.standard,i],  main=i)
+		boxplot(data[index.zero,i]~data$Plate.Bar.Code[index.zero],add=T, col = "blue")
+}
+dev.off()
