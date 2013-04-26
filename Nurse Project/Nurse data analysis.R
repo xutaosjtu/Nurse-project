@@ -1,34 +1,23 @@
-# 1. Data visualization
-# 2. 
+# 1. Data visualization: Show metabolite changes overtime
+# 2. Find differences between day and night shift work
 # Author: tao.xu
 ###############################################################################
 
 index.person = match(samples$Proben_ID[which(samples$SW_Nr == "SW1030")], data$Sample.Identification)
 
-pdf("personal change over time SW1032_unnormalized.pdf", width =20, height=15)
+## Data visualization
+pdf("personal change over time SW1032_unnormalized.pdf", width =20, height=15)#Change over time of unnormalized metabolite concentrations in one sample
 par(mfrow = c(5,5))
 for(i in measures){
 	plot(data[index.person, i], type = "b", main = i, pch = c(21,19)[matrixLOD[index.person,i]+1])
 }
 dev.off()
 
-
-plotNurse = function(data, samples, id){
-	index.person = match(samples$Proben_ID[which(samples$SW_Nr == id)], data$Sample.Identification)
-	pdf(paste("personal change over time ",id,".pdf", sep = "",collapse=""), width =20, height=15)
-	par(mfrow = c(5,5))
-	for(i in measures){
-		subset = as.logical(matrixLOD[index.person,i])
-		if(sum(subset)!=0)	{
-			plot(data[index.person[subset], i], type = "b", main = i, col = c("red", "blue")[samples$Schichtdienst[which(samples$SW_Nr == id)][subset]])
-			points(data[index.person[subset], i], pch = 22, col = c("black")[samples$Morgenurin[which(samples$SW_Nr == id)][subset]])
-		}
-		else plot(0, main = i)
-	}
-	dev.off()
-}
-
 plotNurse = function(data, matrixLOD, id){
+	## plot metabolite concentrations overtime for each nurse  
+	## input: data: metabolite measuresments of M meatbolites in N sample (N*M+x), with x other variables
+	##		  matrixLOD: matrix indicating the measurements above LOD (N*M+y), with y other variables
+	## 		  id: ID number of the nurse
 	index.person = which(matrixLOD$SW_Nr==id)
 	pdf(paste("personal change over time ",id,".pdf", sep = "",collapse=""), width =20, height=15)
 	par(mfrow = c(5,5))
@@ -52,12 +41,13 @@ for(i in names(table(samples$SW_Nr))){
 }
 
 
-pdf("Change over time in all samples.pdf", width =20, height=15)
+pdf("Change over time in all samples.pdf", width =20, height=15)# Change over time in all samples
 	par(mfrow = c(5,5))
 	for(i in measures){
 		subset = as.logical(matrixLOD[,i])
 		if(sum(subset)!=0)	{
-			plot(data.merged[subset, i]~data.merged[subset, "Probennahme_Uhr"], #log = 'y',
+			plot(data.merged[subset, i]~data.merged[subset, "Probennahme_Uhr"], 
+					#log = 'y',
 					main = i, 
 					pch = c(19, 21)[data.merged$Schichtdienst[subset]])
 			#points(data[index.person[subset], i], pch = 22, col = c("black")[samples$Morgenurin[which(samples$SW_Nr == id)][subset]])
@@ -67,7 +57,8 @@ pdf("Change over time in all samples.pdf", width =20, height=15)
 dev.off()
 
 
-## differences between night shift and day shift work
+## Find differences between night shift and day shift work
+# Linear mixed effect model
 require(nlme)
 rst=NULL
 for(i in measures){
