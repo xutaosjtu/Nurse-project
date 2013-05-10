@@ -8,6 +8,7 @@
 
 setwd("D:/Users/tao.xu/Dropbox/Nurse project/")
 
+#data = read.csv("data/2013-04-10_Conc_Rui_Rabstein_Urin_normalisiert.csv")
 data = read.csv("data/2013-04-10_Conc_Rui_Rabstein_Urin.csv")
 #data= data[-c(1:),]
 samples = read.csv("data/2013-01-31 Helmholtz.csv")

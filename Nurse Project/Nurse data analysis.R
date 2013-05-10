@@ -22,12 +22,36 @@ plotNurse = function(data, matrixLOD, id){
 	pdf(paste("personal change over time ",id,".pdf", sep = "",collapse=""), width =20, height=15)
 	par(mfrow = c(5,5))
 	for(i in measures){
-		subset = as.logical(matrixLOD[index.person,i])
-		if(sum(subset)!=0)	{
-			plot(data[index.person[subset], i]~data[index.person[subset], "Probennahme_Uhr"], 
-					main = i, 
-					pch = c(19, 21)[data$Schichtdienst[subset]])
-			#points(data[index.person[subset], i], pch = 22, col = c("black")[samples$Morgenurin[which(samples$SW_Nr == id)][subset]])
+		#subset = as.logical(matrixLOD[index.person,i])
+		if(sum(subset)!=0){
+			tmp = data[index.person[subset],]
+			tmp = tmp[order(tmp$Proben_Nr),]
+			tmp$m = tmp[,i]
+			Levels = unique(tmp[,"Probennahme_Dat"])
+			nl=0;
+			for(l in Levels){
+				if(nl == 0){
+					plot(m~Probennahme_Uhr,
+							tmp,
+							subset = which(tmp$Probennahme_Dat==l),
+							main = i, type = "b", 
+							pch = c(21,21 )[tmp$Schichtdienst],
+							col = c("red","black")[tmp$Schichtdienst],
+							xlim = c(0,23), ylim = range(tmp$m)
+					)
+				}
+				else{
+					points(m~Probennahme_Uhr,
+							tmp,
+							subset = which(tmp$Probennahme_Dat==l),
+							main = i, type = "b", 
+							pch = c(21,21 )[tmp$Schichtdienst],
+							col = c("red","black")[tmp$Schichtdienst]
+					)
+				}
+				#points(data[index.person[subset], i], pch = 22, col = c("black")[samples$Morgenurin[which(samples$SW_Nr == id)][subset]])
+				nl=nl+1
+			}	
 		}
 		else plot(0, main = i)
 	}
@@ -67,8 +91,8 @@ for(i in measures){
 			table(data.merged$Schichtdienst[subset])[1]!=0&
 			table(data.merged$Schichtdienst[subset])[2]!=0
 	){
-		data.merged$m = data.merged[,i]
-		model = lme(m ~ Schichtdienst, data.merged[subset,], random = ~1|SW_Nr)
+		data.merged$m = as.numeric(as.character(data.merged[,i]))
+		model = lme(m ~ Schichtdienst, data.merged[which(subset),], random = ~1|SW_Nr, na.action=na.exclude)
 		rst = rbind(rst, summary(model)$tTable[2,])
 	}
 	else rst = rbind(rst,rep(NA,5))
