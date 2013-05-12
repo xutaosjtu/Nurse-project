@@ -91,6 +91,17 @@ data.merged = data.merged[which(matrixLOD$Creatinine==1), ]# exclude abnormal cr
 matrixLOD = matrixLOD[which(matrixLOD$Creatinine==1),]# exclude abnormal creatinine data
 data.merged = normalize(data.merged,measures)
 
+for(i in measures){
+	data.merged[which(matrixLOD[,i]==0),i]=NA
+}
+
+## outliers
+index=apply(data.merged[,measures],2, function(x) which(abs(x)>mean(x,na.rm=T)+5*sd(x,na.rm=T)|abs(x)<mean(x,na.rm=T)-5*sd(x,na.rm=T))) 
+for(i in measures){
+	data.merged[index[[i]],i]=NA
+}
+
+
 
 ## Effects of sample spinning
 index.spin = sapply(data$Sample.Identification, function(x) grep("PU",x,fixed=T) )

@@ -22,22 +22,23 @@ plotNurse = function(data, matrixLOD, id){
 	pdf(paste("personal change over time ",id,".pdf", sep = "",collapse=""), width =20, height=15)
 	par(mfrow = c(5,5))
 	for(i in measures){
-		#subset = as.logical(matrixLOD[index.person,i])
-		if(sum(subset)!=0){
+		subset = as.logical(matrixLOD[index.person,i])
+		if(sum(subset)!=0 & sum(!is.na(data[index.person[subset],i]))!=0){
 			tmp = data[index.person[subset],]
 			tmp = tmp[order(tmp$Proben_Nr),]
 			tmp$m = tmp[,i]
 			Levels = unique(tmp[,"Probennahme_Dat"])
 			nl=0;
 			for(l in Levels){
+				indexL=which(tmp$Probennahme_Dat==l)
 				if(nl == 0){
 					plot(m~Probennahme_Uhr,
-							tmp,
-							subset = which(tmp$Probennahme_Dat==l),
+							tmp[indexL,],
+							#subset = ,
 							main = i, type = "b", 
-							pch = c(21,21 )[tmp$Schichtdienst],
-							col = c("red","black")[tmp$Schichtdienst],
-							xlim = c(0,23), ylim = range(tmp$m)
+							pch = c(21,19)[tmp$Schichtdienst[indexL]],
+							col = c("blue","red")[tmp$Schichtdienst[indexL]],
+							xlim = c(0,23), ylim = range(tmp$m, na.rm = T)
 					)
 				}
 				else{
@@ -45,8 +46,8 @@ plotNurse = function(data, matrixLOD, id){
 							tmp,
 							subset = which(tmp$Probennahme_Dat==l),
 							main = i, type = "b", 
-							pch = c(21,21 )[tmp$Schichtdienst],
-							col = c("red","black")[tmp$Schichtdienst]
+							pch = c(21,19 )[tmp$Schichtdienst[which(tmp$Probennahme_Dat==l)]],
+							col = c("blue","red")[tmp$Schichtdienst[which(tmp$Probennahme_Dat==l)]]
 					)
 				}
 				#points(data[index.person[subset], i], pch = 22, col = c("black")[samples$Morgenurin[which(samples$SW_Nr == id)][subset]])
