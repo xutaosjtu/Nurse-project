@@ -36,8 +36,8 @@ plotNurse = function(data, matrixLOD, id){
 							tmp[indexL,],
 							#subset = ,
 							main = i, type = "b", 
-							pch = c(21,19)[tmp$Schichtdienst[indexL]],
-							col = c("blue","red")[tmp$Schichtdienst[indexL]],
+							pch = c(19,21)[tmp$Schichtdienst[indexL]],
+							col = c("red","blue")[tmp$Schichtdienst[indexL]],
 							xlim = c(0,23), ylim = range(tmp$m, na.rm = T)
 					)
 				}
@@ -46,8 +46,8 @@ plotNurse = function(data, matrixLOD, id){
 							tmp,
 							subset = which(tmp$Probennahme_Dat==l),
 							main = i, type = "b", 
-							pch = c(21,19 )[tmp$Schichtdienst[which(tmp$Probennahme_Dat==l)]],
-							col = c("blue","red")[tmp$Schichtdienst[which(tmp$Probennahme_Dat==l)]]
+							pch = c(19,21)[tmp$Schichtdienst[indexL]],
+							col = c("red","blue")[tmp$Schichtdienst[indexL]]
 					)
 				}
 				#points(data[index.person[subset], i], pch = 22, col = c("black")[samples$Morgenurin[which(samples$SW_Nr == id)][subset]])
@@ -59,7 +59,7 @@ plotNurse = function(data, matrixLOD, id){
 	dev.off()
 }
 
-plotNurse(data.merged, matrixLOD,"SW1036")
+plotNurse(data.merged, matrixLOD,"SW1030")
 
 for(i in names(table(samples$SW_Nr))){
 	plotNurse(data.merged,matrixLOD,i)
