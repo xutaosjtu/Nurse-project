@@ -102,3 +102,26 @@ rownames(rst) = measures
 rst = data.frame(rst)
 rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
 
+
+## Find chronic effects of night shift and day shift work
+# Linear mixed effect model
+data.merged$group = rep(1,dim(data.merged)[1])
+data.merged$group[which(data.merged$SW_Nr=="SW1039"|data.merged$SW_Nr=="SW1041")]=0
+data.merged$group=as.factor(data.merged$group)
+require(nlme)
+rst=NULL
+for(i in measures){
+  subset = as.logical(matrixLOD[,i])
+  data.merged$m = data.merged[,i]
+  if(sum(subset)>3& i!="Creatinine"&table(data.merged$group[subset])[1]!=0&
+       table(data.merged$group[subset])[2]!=0){
+    #model = lm(m ~ group, data.merged, random = ~1|SW_Nr,na.action=na.exclude)
+    #rst = rbind(rst, summary(model)$tTable[2,])
+    model = lm(m ~ group, data.merged, na.action=na.exclude)
+    rst = rbind(rst, summary(model)$coef[2,])
+  }
+  else rst = rbind(rst,rep(NA,5))
+}
+rownames(rst) = measures
+rst = data.frame(rst)
+rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
