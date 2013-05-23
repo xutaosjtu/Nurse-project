@@ -115,7 +115,7 @@ for(i in measures){
   data.merged$m = data.merged[,i]
   if(sum(subset)>3& i!="Creatinine"&table(data.merged$group[subset])[1]!=0&
        table(data.merged$group[subset])[2]!=0){
-    #model = lm(m ~ group, data.merged, random = ~1|SW_Nr,na.action=na.exclude)
+    #model = lme(m ~ group, data.merged, random = ~1|SW_Nr,na.action=na.exclude)
     #rst = rbind(rst, summary(model)$tTable[2,])
     model = lm(m ~ group, data.merged, na.action=na.exclude)
     rst = rbind(rst, summary(model)$coef[2,])
@@ -125,3 +125,19 @@ for(i in measures){
 rownames(rst) = measures
 rst = data.frame(rst)
 rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
+
+##GEE
+rst = NULL
+for(i in measures[-c(16,39, 81:140)]){
+  subset = as.logical(matrixLOD[,i])
+  data.merged$m = scale(log(data.merged[,i]))
+  if(sum(subset)>100& i!="Creatinine"&table(data.merged$group[subset])[1]!=0&
+       table(data.merged$group[subset])[2]!=0){
+    model = gee(group ~ m, id = SW_Nr, data = data.merged, subset = which(data.merged$Schichtdienst=="Tagschicht"), na.action=na.omit, corstr = "exchangeable", family = binomial)
+    rst = rbind(rst, summary(model)$coef[2,])
+  }
+  else rst = rbind(rst,rep(NA,5))
+}
+rownames(rst) = measures[-c(16,39, 81:140)]
+rst = data.frame(rst, pvalue = 2*pnorm(-abs(rst[,5])))
+write.csv(rst, "Chronic effect of night shift work_GEE_daywork.csv")
