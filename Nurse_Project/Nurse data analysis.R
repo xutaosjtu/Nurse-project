@@ -88,12 +88,12 @@ require(nlme)
 rst=NULL
 for(i in measures){
 	subset = as.logical(matrixLOD[,i])
-	if(sum(subset)>3& i!="Creatinine"&
+	if(sum(subset)>10& i!="Creatinine"&
 			table(data.merged$Schichtdienst[subset])[1]!=0&
 			table(data.merged$Schichtdienst[subset])[2]!=0
 	){
-		data.merged$m = as.numeric(as.character(data.merged[,i]))
-		model = lme(m ~ Schichtdienst, data.merged[which(subset),], random = ~1|SW_Nr, na.action=na.exclude)
+		data.merged$m = scale(log(data.merged[,i]))
+		model = lme(m ~ Schichtdienst, data.merged, random = ~1|SW_Nr, na.action=na.exclude)
 		rst = rbind(rst, summary(model)$tTable[2,])
 	}
 	else rst = rbind(rst,rep(NA,5))
@@ -101,7 +101,25 @@ for(i in measures){
 rownames(rst) = measures
 rst = data.frame(rst)
 rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
+write.csv(rst, file = "Short term effect of night shift_mixed model.csv")
 
+##gee
+rst=NULL
+for(i in measures){
+  subset = as.logical(matrixLOD[,i])
+  if(sum(subset)>10& i!="Creatinine"&
+       table(data.merged$Schichtdienst[subset])[1]!=0&
+       table(data.merged$Schichtdienst[subset])[2]!=0
+  ){
+    data.merged$m = scale(log(data.merged[,i]))
+    model = gee(m ~ Schichtdienst, id = SW_Nr, data = data.merged, na.action=na.omit, corstr = "exchangeable")
+    rst = rbind(rst, summary(model)$coef[2,])
+  }
+  else rst = rbind(rst,rep(NA,5))
+}
+rownames(rst) = measures
+rst = data.frame(rst, pvalue = 2*pnorm(-abs(rst[,5])))
+write.csv(rst, file = "Short term effect of night shift_GEE.csv")
 
 ## Find chronic effects of night shift and day shift work
 # Linear mixed effect model
@@ -125,19 +143,38 @@ for(i in measures){
 rownames(rst) = measures
 rst = data.frame(rst)
 rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
+write.csv("")
 
 ##GEE
+data.merged = data.merged[order(data.merged$SW_Nr),]
 rst = NULL
-for(i in measures[-c(16,39, 81:140)]){
+for(i in measures){
   subset = as.logical(matrixLOD[,i])
   data.merged$m = scale(log(data.merged[,i]))
   if(sum(subset)>100& i!="Creatinine"&table(data.merged$group[subset])[1]!=0&
        table(data.merged$group[subset])[2]!=0){
-    model = gee(group ~ m, id = SW_Nr, data = data.merged, subset = which(data.merged$Schichtdienst=="Tagschicht"), na.action=na.omit, corstr = "exchangeable", family = binomial)
+    model = gee(m ~ group, id = SW_Nr, data = data.merged, na.action=na.omit, corstr = "exchangeable")
     rst = rbind(rst, summary(model)$coef[2,])
   }
   else rst = rbind(rst,rep(NA,5))
 }
-rownames(rst) = measures[-c(16,39, 81:140)]
+rownames(rst) = measures
 rst = data.frame(rst, pvalue = 2*pnorm(-abs(rst[,5])))
 write.csv(rst, "Chronic effect of night shift work_GEE_daywork.csv")
+
+pdf("metabolite concentration between cases and controls.pdf", width =20, height=15)
+par(mfrow = c(5,10))
+for(i in measures)
+{
+  if(sum(!is.na(data.merged[,i])!=0))
+  {
+    plot(data.merged$group,data.merged[,i],log="y", main = paste(i, "case vs control"))
+    plot(data.merged$Schichtdienst,data.merged[,i],log="y", main = paste(i, "day vs night"), col = "grey")
+  }
+  else {
+    plot(0, main =paste(i, "case vs control"))
+    plot(0, main =paste(i, "day vs night"))
+  }
+}
+dev.off()
+
