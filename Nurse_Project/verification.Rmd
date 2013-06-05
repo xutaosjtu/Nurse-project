@@ -5,6 +5,7 @@ Here includes the r script to verify Zhonghao's result of Gln concentration at d
 
 Import data
 ```{r fig.width=7, fig.height=6}
+setwd("D:/Users/tao.xu/Dropbox/Nurse project/")
 metabolon = read.csv("data/Metabolon.csv")
 id.meta= which(metabolon$BIOCHEMICAL %in% c("glutamine","creatinine"))
 id.001 = grep("001",colnames(metabolon))

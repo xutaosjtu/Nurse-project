@@ -131,12 +131,12 @@ rst=NULL
 for(i in measures){
   subset = as.logical(matrixLOD[,i])
   data.merged$m = data.merged[,i]
-  if(sum(subset)>3& i!="Creatinine"&table(data.merged$group[subset])[1]!=0&
+  if(sum(subset)>100& i!="Creatinine"&table(data.merged$group[subset])[1]!=0&
        table(data.merged$group[subset])[2]!=0){
-    #model = lme(m ~ group, data.merged, random = ~1|SW_Nr,na.action=na.exclude)
-    #rst = rbind(rst, summary(model)$tTable[2,])
-    model = lm(m ~ group, data.merged, na.action=na.exclude)
-    rst = rbind(rst, summary(model)$coef[2,])
+    model = lme(m ~ group, data.merged, random = ~1|SW_Nr,na.action=na.exclude)
+    rst = rbind(rst, summary(model)$tTable[2,])
+    #model = lm(m ~ group, data.merged, na.action=na.exclude)
+    #rst = rbind(rst, summary(model)$coef[2,])
   }
   else rst = rbind(rst,rep(NA,5))
 }
