@@ -9,10 +9,15 @@
 setwd("D:/Users/tao.xu/Dropbox/Nurse project/")
 
 #data = read.csv("data/2013-04-10_Conc_Rui_Rabstein_Urin_normalisiert.csv")
-data = read.csv("data/2013-04-10_Conc_Rui_Rabstein_Urin.csv")
+#data = read.csv("data/2013-04-10_Conc_Rui_Rabstein_Urin.csv")
+data = read.csv("data/Urin data_all samples.csv")
 #data= data[-c(1:),]
-samples = read.csv("data/2013-01-31 Helmholtz.csv")
+#samples = read.csv("data/2013-01-31 Helmholtz.csv")
 #samples = samples[1:429,]
+samples = read.csv("data/Sample map_all sampel.csv")
+samples.addition = read.csv("data/sample_additional infor.csv")
+samples = merge(samples, samples.addition, by.x = "SW_Nr", by.y = "P_ID")
+rm(samples.addition)
 
 ###################################################
 # Overall quality of the measurement
@@ -26,7 +31,9 @@ index.ref = sapply(index.ref, function(x) length(x)!=0)
 ##over all CV and within plate CV 
 rst=NULL
 for (i in measures){
-	within = tapply(data[index.ref,i], INDEX = data$Plate.Bar.Code[index.ref], function(y) 		sd(y,na.rm=T)/mean(y,na.rm=T)
+	within = tapply(data[index.ref,i], 
+                  INDEX = data$Plate.Bar.Code[index.ref], 
+                  function(y) sd(y,na.rm=T)/mean(y,na.rm=T)
 	)
 	overall = sd(data[index.ref,i],na.rm=T)/mean(data[index.ref,i],na.rm=T)
 	rsti = c(within,overall)
@@ -60,7 +67,7 @@ aboveLOD = function(data){
 }
 
 matrixLOD = data[,measures] # indicator matrix of measurements above LOD
-for(i in names(table(data$Plate.Bar.Code))[2:7]){
+for(i in names(table(data$Plate.Bar.Code))){
 	plate = which(data$Plate.Bar.Code == i)
 	matrixLOD[plate,]=aboveLOD(data[plate,])
 }
@@ -69,13 +76,14 @@ matrixLOD = data.frame(matrixLOD,
 matrixLOD = merge(matrixLOD,samples, by.x = "Sample.Identification", by.y = "Proben_ID")
 
 rst=NULL # measurements above LOD in each plate and all plates
-for(i in names(table(data$Plate.Bar.Code))[2:7]){
+for(i in names(table(data$Plate.Bar.Code))){
 	subset = which(data$Plate.Bar.Code == i)
-	rst = cbind(rst,aboveLOD(data[subset,]))
+	tmp = aboveLOD(data[subset,])
+	rst = cbind(rst,apply(tmp,2,sum, na.rm = T))
 }
-colnames(rst) = names(table(data$Plate.Bar.Code))[2:7]
+colnames(rst) = names(table(data$Plate.Bar.Code))
 rst = data.frame(rst, overall = apply(rst,1,sum))
-rst[,7]=rst[,7]/429
+rst$overall=rst$overall/nrow(samples)
 write.csv(rst, file = "overLOD_nurse.csv")
 
 ## data Normalization

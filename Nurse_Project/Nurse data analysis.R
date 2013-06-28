@@ -3,7 +3,12 @@
 # Author: tao.xu
 ###############################################################################
 
-index.person = match(samples$Proben_ID[which(samples$SW_Nr == "SW1030")], data$Sample.Identification)
+require(nlme)
+require(gee)
+
+data.merged$Schichtdienst =factor(data.merged$Schichtdienst, levels = c("Tagschicht", "Nachtschicht"))
+
+#index.person = match(samples$Proben_ID[which(samples$SW_Nr == "SW1030")], data$Sample.Identification)
 
 ## Data visualization
 pdf("personal change over time SW1032_unnormalized.pdf", width =20, height=15)#Change over time of unnormalized metabolite concentrations in one sample
@@ -84,51 +89,66 @@ dev.off()
 
 ## Find differences between night shift and day shift work
 # Linear mixed effect model
-require(nlme)
 rst=NULL
-for(i in measures){
+for(i in valid_measures){
 	subset = as.logical(matrixLOD[,i])
 	if(sum(subset)>10& i!="Creatinine"&
 			table(data.merged$Schichtdienst[subset])[1]!=0&
 			table(data.merged$Schichtdienst[subset])[2]!=0
 	){
 		data.merged$m = scale(log(data.merged[,i]))
-		model = lme(m ~ Schichtdienst, data.merged, random = ~1|SW_Nr, na.action=na.exclude)
+		model = lme(m ~ Schichtdienst + Alter + BMI + AR_Rauch_zurzt,
+                data.merged, 
+                subset = which(data.merged$group == 1&data.merged$SW_Nr!="SW1042"),
+                random = ~1|SW_Nr, 
+                na.action=na.exclude
+                )
 		rst = rbind(rst, summary(model)$tTable[2,])
 	}
 	else rst = rbind(rst,rep(NA,5))
 }
-rownames(rst) = measures
+rownames(rst) = valid_measures
 rst = data.frame(rst)
 rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
-write.csv(rst, file = "Short term effect of night shift_mixed model.csv")
+write.csv(rst, file = "Short term effect of night shift_mixed model_age_BMI_smoking_exclude diab.csv")
 
 ##gee
 rst=NULL
-for(i in measures){
+for(i in valid_measures){
   subset = as.logical(matrixLOD[,i])
   if(sum(subset)>10& i!="Creatinine"&
        table(data.merged$Schichtdienst[subset])[1]!=0&
        table(data.merged$Schichtdienst[subset])[2]!=0
   ){
     data.merged$m = scale(log(data.merged[,i]))
-    model = gee(m ~ Schichtdienst, id = SW_Nr, data = data.merged, na.action=na.omit, corstr = "exchangeable")
+    model = gee(m ~ Schichtdienst + Alter, 
+                id = SW_Nr, 
+                data = data.merged, 
+                subset = which(data.merged$group == 1),
+                na.action=na.omit, 
+                corstr = "exchangeable")
     rst = rbind(rst, summary(model)$coef[2,])
   }
   else rst = rbind(rst,rep(NA,5))
 }
-rownames(rst) = measures
+rownames(rst) = valid_measures
 rst = data.frame(rst, pvalue = 2*pnorm(-abs(rst[,5])))
-write.csv(rst, file = "Short term effect of night shift_GEE.csv")
+write.csv(rst, file = "Short term effect of night shift_GEE_age.csv")
 
 ## Find chronic effects of night shift and day shift work
-# Linear mixed effect model
-data.merged$group = rep(1,dim(data.merged)[1])
-data.merged$group[which(data.merged$SW_Nr=="SW1039"|data.merged$SW_Nr=="SW1041")]=0
+data.merged$group = rep(1,nrow(data.merged))
+data.merged$group[which(data.merged$Kontrolle=="K")]=0
 data.merged$group=as.factor(data.merged$group)
-require(nlme)
+
+batch2 = names(table(data$Plate.Bar.Code))[7:12]
+data.merged$batch = rep(1, nrow(data.merged))
+data.merged$batch[which(data.merged$Plate.Bar.Code %in% batch2)] = 2
+data.merged$batch = as.factor(data.merged$batch)
+rm(batch2)
+
+# Linear mixed effect model
 rst=NULL
-for(i in measures){
+for(i in valid_measures){
   subset = as.logical(matrixLOD[,i])
   data.merged$m = data.merged[,i]
   if(sum(subset)>100& i!="Creatinine"&table(data.merged$group[subset])[1]!=0&
@@ -140,7 +160,7 @@ for(i in measures){
   }
   else rst = rbind(rst,rep(NA,5))
 }
-rownames(rst) = measures
+rownames(rst) = valid_measures
 rst = data.frame(rst)
 rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
 write.csv("")
@@ -148,19 +168,26 @@ write.csv("")
 ##GEE
 data.merged = data.merged[order(data.merged$SW_Nr),]
 rst = NULL
-for(i in measures){
+for(i in valid_measures){
   subset = as.logical(matrixLOD[,i])
   data.merged$m = scale(log(data.merged[,i]))
   if(sum(subset)>100& i!="Creatinine"&table(data.merged$group[subset])[1]!=0&
        table(data.merged$group[subset])[2]!=0){
-    model = gee(m ~ group, id = SW_Nr, data = data.merged, na.action=na.omit, corstr = "exchangeable")
+    model = gee(m ~ group + Alter + BMI + AR_Rauch_zurzt, 
+                id = SW_Nr, 
+                data = data.merged, 
+                subset = which(data.merged$Schichtdienst=="Tagschicht"&data.merged$SW_Nr!="SW1042"),
+                na.action=na.omit, 
+                corstr = "exchangeable"
+                )
     rst = rbind(rst, summary(model)$coef[2,])
   }
   else rst = rbind(rst,rep(NA,5))
 }
-rownames(rst) = measures
-rst = data.frame(rst, pvalue = 2*pnorm(-abs(rst[,5])))
-write.csv(rst, "Chronic effect of night shift work_GEE_daywork.csv")
+rownames(rst) = valid_measures
+rst = data.frame(rst, p.value = 2*pnorm(-abs(rst[,5])))
+rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
+write.csv(rst, "Chronic effect of night shift work_GEE_daywork_age_BMI_smoking_exclude diab.csv")
 
 pdf("metabolite concentration between cases and controls.pdf", width =20, height=15)
 par(mfrow = c(5,10))
