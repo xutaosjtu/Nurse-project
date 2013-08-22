@@ -1,0 +1,57 @@
+Title Population Characteristics
+========================================================
+
+```{r}
+require(xtable)
+```
+
+Do a descriptive analysis by calculating the characteristics of the participants to find intersting features which different between two groups.
+
+```{r warning=FALSE, results = "asis"}
+setwd("D:/Users/tao.xu/Dropbox/Nurse project")
+load("D:/Users/tao.xu/Documents/R-studio git/Nurse-project/.RData")
+
+variables = read.csv("data/variable description.csv")
+
+
+characteristics <-function(variable, index){
+  desc = tapply(variable, INDEX = index, function(x) sum(x==1, na.rm = T)/length(x))
+  
+  pvalue = tryCatch({
+      fisher.test(table(variable,index))$p.value
+     }, error = function(e){
+       NA
+     }
+  )
+  return(c(desc, pvalue))
+}
+
+rst = NULL
+for(i in 1:nrow(variables)){
+  v = as.character(variables[i,2])
+  if(i %in% which(variables$Format != "")){
+    rst = rbind(rst, characteristics(samples.addition[,v], samples.addition$Kontrolle))
+  }
+  else{
+    mean.v = tapply(samples.addition[,v], INDEX = samples.addition$Kontrolle, mean, na.rm = T)
+    sd.v = tapply(samples.addition[,v], INDEX = samples.addition$Kontrolle, sd, na.rm = T)
+    desc = paste(round(mean.v,2),round(sd.v,2), sep = "±")
+    pvalue = tryCatch({
+      wilcox.test(x = samples.addition[which(samples.addition$Kontrolle=="K"),v], 
+                         y = samples.addition[which(samples.addition$Kontrolle==""),v])$p.value
+      }, error = function(e){
+        NA
+      }
+    )
+    rst = rbind(rst, c(desc, pvalue))
+    #pvalue = kruskal.test (x = samples.addition[,v], 
+    #                     g = samples.addition$Kontrolle)
+  }
+}
+rownames(rst) = variables[,2]
+#write.csv(rst, "characteristics.csv")
+print(xtable(rst), type = "html")
+```
+
+Amnong the results, we find the Schilddrüsenerkrankung (P-value=`r round(as.numeric(rst["SD",3]), 4)`) is significantly different between the cases and control group.
+

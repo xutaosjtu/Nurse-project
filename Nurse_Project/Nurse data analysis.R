@@ -97,7 +97,7 @@ for(i in valid_measures){
 			table(data.merged$Schichtdienst[subset])[2]!=0
 	){
 		data.merged$m = scale(log(data.merged[,i]))
-		model = lme(m ~ Schichtdienst + Alter + BMI + AR_Rauch_zurzt,
+		model = lme(m ~ Schichtdienst + Alter + BMI + AR_Rauch_zurzt + SD + medic.type,
                 data.merged, 
                 subset = which(data.merged$group == 1&data.merged$SW_Nr!="SW1042"),
                 random = ~1|SW_Nr, 
@@ -110,7 +110,7 @@ for(i in valid_measures){
 rownames(rst) = valid_measures
 rst = data.frame(rst)
 rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
-write.csv(rst, file = "Short term effect of night shift_mixed model_age_BMI_smoking_exclude diab.csv")
+write.csv(rst, file = "Short term effect of night shift_mixed model_age_BMI_smoking_thyroid disease_meidcation_exclude diab.csv")
 
 ##gee
 rst=NULL
@@ -121,12 +121,13 @@ for(i in valid_measures){
        table(data.merged$Schichtdienst[subset])[2]!=0
   ){
     data.merged$m = scale(log(data.merged[,i]))
-    model = gee(m ~ Schichtdienst + Alter, 
-                id = SW_Nr, 
-                data = data.merged, 
-                subset = which(data.merged$group == 1),
-                na.action=na.omit, 
-                corstr = "exchangeable")
+    model = gee( m ~ Schichtdienst #+ Alter
+                , id = SW_Nr
+                , data = data.merged
+                , subset = which(data.merged$group == 1)
+                , na.action=na.omit 
+                , corstr = "AR-M"
+                 )
     rst = rbind(rst, summary(model)$coef[2,])
   }
   else rst = rbind(rst,rep(NA,5))
@@ -173,11 +174,12 @@ for(i in valid_measures){
   data.merged$m = scale(log(data.merged[,i]))
   if(sum(subset)>100& i!="Creatinine"&table(data.merged$group[subset])[1]!=0&
        table(data.merged$group[subset])[2]!=0){
-    model = gee(m ~ group + Alter + BMI + AR_Rauch_zurzt, 
+    model = gee(m ~ group + batch + Alter + BMI + AR_Rauch_zurzt  + medic.type, # 
                 id = SW_Nr, 
                 data = data.merged, 
-                subset = which(data.merged$Schichtdienst=="Tagschicht"&data.merged$SW_Nr!="SW1042"),
+                subset = which(data.merged$Schichtdienst=="Tagschicht"&data.merged$SW_Nr!="SW1042"&data.merged$Alter>=45),
                 na.action=na.omit, 
+               # family = binomial,
                 corstr = "exchangeable"
                 )
     rst = rbind(rst, summary(model)$coef[2,])
@@ -187,7 +189,7 @@ for(i in valid_measures){
 rownames(rst) = valid_measures
 rst = data.frame(rst, p.value = 2*pnorm(-abs(rst[,5])))
 rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
-write.csv(rst, "Chronic effect of night shift work_GEE_daywork_age_BMI_smoking_exclude diab.csv")
+write.csv(rst, "Chronic effect of night shift work_GEE_daywork_age_BMI_smoking_exclude diab_medic_age above 45.csv")
 
 pdf("metabolite concentration between cases and controls.pdf", width =20, height=15)
 par(mfrow = c(5,10))
