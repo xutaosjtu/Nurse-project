@@ -97,9 +97,9 @@ for(i in valid_measures){
 			table(data.merged$Schichtdienst[subset])[2]!=0
 	){
 		data.merged$m = scale(log(data.merged[,i]))
-		model = lme(m ~ Schichtdienst + Alter + BMI + AR_Rauch_zurzt + as.factor(SD) + batch,
+		model = lme(m ~ Schichtdienst + Alter + BMI + AR_Rauch_zurzt + as.factor(batch),
                 data.merged, 
-                subset = which(data.merged$group == 1&data.merged$SW_Nr!="SW1042"),
+                 subset = which(data.merged$group == 1 ),
                 random = ~1|SW_Nr, 
                 na.action=na.exclude
                 )
@@ -110,7 +110,7 @@ for(i in valid_measures){
 rownames(rst) = valid_measures
 rst = data.frame(rst)
 rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
-write.csv(rst, file = "Short term effect of night shift_mixed model_age_BMI_smoking_thyroid disease_meidcation_exclude diab.csv")
+write.csv(rst, file = "Short term effect of night shift_mixed model_age_BMI_smoking_thyroid disease_meidcation.csv")
 
 ##gee
 rst=NULL
@@ -121,12 +121,12 @@ for(i in valid_measures){
        table(data.merged$Schichtdienst[subset])[2]!=0
   ){
     data.merged$m = scale(log(data.merged[,i]))
-    model = gee( m ~ Schichtdienst #+ Alter
+    model = gee( m ~ Schichtdienst + Alter+ BMI + AR_Rauch_zurzt + as.factor(SD) + Plate.Bar.Code
                 , id = SW_Nr
                 , data = data.merged
                 , subset = which(data.merged$group == 1)
                 , na.action=na.omit 
-                , corstr = "AR-M"
+                , corstr = "exchangeable"
                  )
     rst = rbind(rst, summary(model)$coef[2,])
   }
@@ -174,7 +174,7 @@ for(i in valid_measures){
   data.merged$m = scale(log(data.merged[,i]))
   if(sum(subset)>100& i!="Creatinine" & table(data.merged$group[subset])[1]!=0&
        table(data.merged$group[subset])[2]!=0){
-    model = gee(m ~ group + batch + Alter + BMI + AR_Rauch_zurzt + as.factor(SD), # 
+    model = gee(m ~ as.factor(group)+as.factor(SD) + Alter + BMI + AR_Rauch_zurzt  + as.factor(batch), # 
                 id = SW_Nr, 
                 data = data.merged, 
                 subset = which(data.merged$Schichtdienst=="Tagschicht"&data.merged$SW_Nr!="SW1042"), #&data.merged$Alter>=45
