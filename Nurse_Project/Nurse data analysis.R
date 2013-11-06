@@ -27,11 +27,11 @@ plotNurse = function(data, matrixLOD, id){
 	pdf(paste("personal change over time ",id,".pdf", sep = "",collapse=""), width =20, height=15)
 	par(mfrow = c(5,5))
 	for(i in measures){
-		subset = as.logical(matrixLOD[index.person,i])
-		if(sum(subset)!=0 & sum(!is.na(data[index.person[subset],i]))!=0){
-			tmp = data[index.person[subset],]
-			tmp = tmp[order(tmp$Proben_Nr),]
-			tmp$m = tmp[,i]
+	  tmp$m = tmp[,i]
+		#subset = as.logical(matrixLOD[index.person,i])
+		if(sum(!is.na(tmp$m))!=0){
+			#tmp = data[index.person[subset],]
+			#tmp = tmp[order(tmp$Proben_Nr),]
 			Levels = unique(tmp[,"Probennahme_Dat"])
 			nl=0;
 			for(l in Levels){
@@ -91,13 +91,13 @@ dev.off()
 # Linear mixed effect model
 rst=NULL
 for(i in valid_measures){
-	subset = as.logical(matrixLOD[,i])
+	subset = !is.na(data.merged[,i])
 	if(sum(subset)>10& i!="Creatinine"&
 			table(data.merged$Schichtdienst[subset])[1]!=0&
 			table(data.merged$Schichtdienst[subset])[2]!=0
 	){
 		data.merged$m = scale(log(data.merged[,i]))
-		model = lme(m ~ Schichtdienst + Alter + BMI + AR_Rauch_zurzt + SD + medic.type,
+		model = lme(m ~ Schichtdienst + Alter + BMI + AR_Rauch_zurzt + as.factor(SD) + batch,
                 data.merged, 
                 subset = which(data.merged$group == 1&data.merged$SW_Nr!="SW1042"),
                 random = ~1|SW_Nr, 
@@ -115,7 +115,7 @@ write.csv(rst, file = "Short term effect of night shift_mixed model_age_BMI_smok
 ##gee
 rst=NULL
 for(i in valid_measures){
-  subset = as.logical(matrixLOD[,i])
+  subset = !is.na(data.merged[,i])
   if(sum(subset)>10& i!="Creatinine"&
        table(data.merged$Schichtdienst[subset])[1]!=0&
        table(data.merged$Schichtdienst[subset])[2]!=0
@@ -148,36 +148,36 @@ data.merged$batch = as.factor(data.merged$batch)
 rm(batch2)
 
 # Linear mixed effect model
-rst=NULL
-for(i in valid_measures){
-  subset = as.logical(matrixLOD[,i])
-  data.merged$m = data.merged[,i]
-  if(sum(subset)>100& i!="Creatinine"&table(data.merged$group[subset])[1]!=0&
-       table(data.merged$group[subset])[2]!=0){
-    model = lme(m ~ group, data.merged, random = ~1|SW_Nr,na.action=na.exclude)
-    rst = rbind(rst, summary(model)$tTable[2,])
-    #model = lm(m ~ group, data.merged, na.action=na.exclude)
-    #rst = rbind(rst, summary(model)$coef[2,])
-  }
-  else rst = rbind(rst,rep(NA,5))
-}
-rownames(rst) = valid_measures
-rst = data.frame(rst)
-rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
-write.csv("")
+# rst=NULL
+# for(i in valid_measures){
+#   subset = as.logical(matrixLOD[,i])
+#   data.merged$m = data.merged[,i]
+#   if(sum(subset)>100& i!="Creatinine"&table(data.merged$group[subset])[1]!=0&
+#        table(data.merged$group[subset])[2]!=0){
+#     model = lme(m ~ group, data.merged, random = ~1|SW_Nr,na.action=na.exclude)
+#     rst = rbind(rst, summary(model)$tTable[2,])
+#     #model = lm(m ~ group, data.merged, na.action=na.exclude)
+#     #rst = rbind(rst, summary(model)$coef[2,])
+#   }
+#   else rst = rbind(rst,rep(NA,5))
+# }
+# rownames(rst) = valid_measures
+# rst = data.frame(rst)
+# rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
+# write.csv("")
 
 ##GEE
-data.merged = data.merged[order(data.merged$SW_Nr),]
+data.merged = data.merged[order(data.merged$SW_Nr, data.merged$Probennahme_Dat, data.merged$Probennahme_Uhr),]
 rst = NULL
 for(i in valid_measures){
-  subset = as.logical(matrixLOD[,i])
+  subset = !is.na(data.merged[,i])
   data.merged$m = scale(log(data.merged[,i]))
-  if(sum(subset)>100& i!="Creatinine"&table(data.merged$group[subset])[1]!=0&
+  if(sum(subset)>100& i!="Creatinine" & table(data.merged$group[subset])[1]!=0&
        table(data.merged$group[subset])[2]!=0){
-    model = gee(m ~ group + batch + Alter + BMI + AR_Rauch_zurzt  + medic.type, # 
+    model = gee(m ~ group + batch + Alter + BMI + AR_Rauch_zurzt + as.factor(SD), # 
                 id = SW_Nr, 
                 data = data.merged, 
-                subset = which(data.merged$Schichtdienst=="Tagschicht"&data.merged$SW_Nr!="SW1042"&data.merged$Alter>=45),
+                subset = which(data.merged$Schichtdienst=="Tagschicht"&data.merged$SW_Nr!="SW1042"), #&data.merged$Alter>=45
                 na.action=na.omit, 
                # family = binomial,
                 corstr = "exchangeable"
@@ -189,7 +189,7 @@ for(i in valid_measures){
 rownames(rst) = valid_measures
 rst = data.frame(rst, p.value = 2*pnorm(-abs(rst[,5])))
 rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
-write.csv(rst, "Chronic effect of night shift work_GEE_daywork_age_BMI_smoking_exclude diab_medic_age above 45.csv")
+write.csv(rst, "Chronic effect of night shift work_GEE_daywork_age_BMI_smoking_exclude diab.csv")
 
 pdf("metabolite concentration between cases and controls.pdf", width =20, height=15)
 par(mfrow = c(5,10))
