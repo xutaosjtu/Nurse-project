@@ -6,27 +6,67 @@
 require(nlme)
 require(gee)
 
-data.merged$Schichtdienst =factor(data.merged$Schichtdienst, levels = c("Tagschicht", "Nachtschicht"))
-
-#index.person = match(samples$Proben_ID[which(samples$SW_Nr == "SW1030")], data$Sample.Identification)
-
-## Data visualization
-pdf("personal change over time SW1032_unnormalized.pdf", width =20, height=15)#Change over time of unnormalized metabolite concentrations in one sample
-par(mfrow = c(5,5))
-for(i in measures){
-	plot(data[index.person, i], type = "b", main = i, pch = c(21,19)[matrixLOD[index.person,i]+1])
-}
+pdf("correlation between metabolites.pdf", width = 10, height = 10)
+col3 <- colorRampPalette(c("red", "white", "blue"))  
+corrplot(cor(data.merged[,valid_measures], use = "pair"),col=col3(100), tl.col="black")
 dev.off()
 
-plotNurse = function(data, matrixLOD, id){
+data.merged$Schichtdienst =factor(data.merged$Schichtdienst, levels = c("Tagschicht", "Nachtschicht"))
+data.merged = data.merged[order(data.merged$SW_Nr, data.merged$Probennahme_Dat, data.merged$Probennahme_Uhr),]
+
+data.merged$Probennahme_Uhr = sapply(data.merged$Probennahme_Uhr, function(x) return(x%%1/0.6+floor(x)))
+
+### calculate the time interval between two samples
+data.merged$time_interval = 0
+for(i in 1:(nrow(data.merged)-1)){
+  if(data.merged$Probennahme_Uhr[i]<data.merged$Probennahme_Uhr[i+1]){
+    data.merged$time_interval[i+1] = data.merged$Probennahme_Uhr[i+1]-data.merged$Probennahme_Uhr[i]
+  }
+  else data.merged$time_interval[i+1] = data.merged$Probennahme_Uhr[i+1]+24-data.merged$Probennahme_Uhr[i]
+}
+
+par(mfrow = c(3,3))
+for(p in data.merged$SW_Nr){
+  sample_person = which(data.merged$SW_Nr==p)
+  tmp_person = data.merged[sample_person,]
+  nl = 0
+  for(day in unique(tmp_person$Probennahme_Dat)){
+    sample_day = which(data.merged$Probennahme_Dat[sample_person]==day)
+    tmp = tmp_person[sample_day,]
+    
+    tmp$Arg[which(is.na(tmp$Arg))] = mean(tmp$Arg, na.rm = T)
+    tmp$Arg = tmp$Arg*tmp$time_interval
+    
+    tmp.rst = cumsum(tmp$Arg)
+    if(nl==0){
+      plot(tmp.rst~ tmp$Probennahme_Uhr[which(tmp$Probennahme_Dat==day)], type = "b", xlim = c(0,24), ylim = range(0,100), main = "Arg", col = tmp$Schichtdienst[1])
+    }
+    else points(tmp.rst~ tmp$Probennahme_Uhr[which(tmp$Probennahme_Dat==day)], type = "b", xlim = c(0,24), col = tmp$Schichtdienst[1])
+    
+    nl = nl+1
+  }
+}
+
+
+# index.person = match(samples$Proben_ID[which(samples$SW_Nr == "SW1030")], data$Sample.Identification)
+# 
+# ## Data visualization
+# pdf("personal change over time SW1032_unnormalized.pdf", width =20, height=15)#Change over time of unnormalized metabolite concentrations in one sample
+# par(mfrow = c(5,5))
+# for(i in measures){
+# 	plot(data[index.person, i], type = "b", main = i, pch = c(21,19)[matrixLOD[index.person,i]+1])
+# }
+# dev.off()
+
+plotNurse = function(data, id){
 	## plot metabolite concentrations overtime for each nurse  
 	## input: data: metabolite measuresments of M meatbolites in N sample (N*M+x), with x other variables
 	##		  matrixLOD: matrix indicating the measurements above LOD (N*M+y), with y other variables
 	## 		  id: ID number of the nurse
-	index.person = which(matrixLOD$SW_Nr==id)
+	tmp = subset(data, SW_Nr==id)
 	pdf(paste("personal change over time ",id,".pdf", sep = "",collapse=""), width =20, height=15)
 	par(mfrow = c(5,5))
-	for(i in measures){
+	for(i in valid_measures){
 	  tmp$m = tmp[,i]
 		#subset = as.logical(matrixLOD[index.person,i])
 		if(sum(!is.na(tmp$m))!=0){
@@ -55,7 +95,6 @@ plotNurse = function(data, matrixLOD, id){
 							col = c("red","blue")[tmp$Schichtdienst[indexL]]
 					)
 				}
-				#points(data[index.person[subset], i], pch = 22, col = c("black")[samples$Morgenurin[which(samples$SW_Nr == id)][subset]])
 				nl=nl+1
 			}	
 		}
@@ -64,22 +103,28 @@ plotNurse = function(data, matrixLOD, id){
 	dev.off()
 }
 
-plotNurse(data.merged, matrixLOD,"SW1030")
+plotNurse(data.merged, "SW1036")
 
 for(i in names(table(samples$SW_Nr))){
-	plotNurse(data.merged,matrixLOD,i)
+	plotNurse(data.merged,i)
 }
+
+subset = data.merged$SW_Nr=="SW1040"
+plot(log(data.merged[subset, i]), pch = c(19, 21)[data.merged$Schichtdienst[subset]],
+     col = c("red", "blue")[data.merged$Schichtdienst[subset]], type = 'b')
 
 
 pdf("Change over time in all samples.pdf", width =20, height=15)# Change over time in all samples
 	par(mfrow = c(5,5))
 	for(i in measures){
-		subset = as.logical(matrixLOD[,i])
+		subset = !is.na(data.merged[,i])
 		if(sum(subset)!=0)	{
-			plot(data.merged[subset, i]~data.merged[subset, "Probennahme_Uhr"], 
+			plot(log(data.merged[subset, i])~data.merged[subset, "Probennahme_Uhr"], 
 					#log = 'y',
 					main = i, 
-					pch = c(19, 21)[data.merged$Schichtdienst[subset]])
+					pch = c(19, 21)[data.merged$Schichtdienst[subset]],
+           col = c("red", "blue")[data.merged$Schichtdienst[subset]]
+           )
 			#points(data[index.person[subset], i], pch = 22, col = c("black")[samples$Morgenurin[which(samples$SW_Nr == id)][subset]])
 		}
 		else plot(0, main = i)
@@ -87,54 +132,6 @@ pdf("Change over time in all samples.pdf", width =20, height=15)# Change over ti
 dev.off()
 
 
-## Find differences between night shift and day shift work
-# Linear mixed effect model
-rst=NULL
-for(i in valid_measures){
-	subset = !is.na(data.merged[,i])
-	if(sum(subset)>10& i!="Creatinine"&
-			table(data.merged$Schichtdienst[subset])[1]!=0&
-			table(data.merged$Schichtdienst[subset])[2]!=0
-	){
-		data.merged$m = scale(log(data.merged[,i]))
-		model = lme(m ~ Schichtdienst + Alter + BMI + AR_Rauch_zurzt + as.factor(batch),
-                data.merged, 
-                 subset = which(data.merged$group == 1 ),
-                random = ~1|SW_Nr, 
-                na.action=na.exclude
-                )
-		rst = rbind(rst, summary(model)$tTable[2,])
-	}
-	else rst = rbind(rst,rep(NA,5))
-}
-rownames(rst) = valid_measures
-rst = data.frame(rst)
-rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
-write.csv(rst, file = "Short term effect of night shift_mixed model_age_BMI_smoking_thyroid disease_meidcation.csv")
-
-##gee
-rst=NULL
-for(i in valid_measures){
-  subset = !is.na(data.merged[,i])
-  if(sum(subset)>10& i!="Creatinine"&
-       table(data.merged$Schichtdienst[subset])[1]!=0&
-       table(data.merged$Schichtdienst[subset])[2]!=0
-  ){
-    data.merged$m = scale(log(data.merged[,i]))
-    model = gee( m ~ Schichtdienst + Alter+ BMI + AR_Rauch_zurzt + as.factor(SD) + Plate.Bar.Code
-                , id = SW_Nr
-                , data = data.merged
-                , subset = which(data.merged$group == 1)
-                , na.action=na.omit 
-                , corstr = "exchangeable"
-                 )
-    rst = rbind(rst, summary(model)$coef[2,])
-  }
-  else rst = rbind(rst,rep(NA,5))
-}
-rownames(rst) = valid_measures
-rst = data.frame(rst, pvalue = 2*pnorm(-abs(rst[,5])))
-write.csv(rst, file = "Short term effect of night shift_GEE_age.csv")
 
 ## Find chronic effects of night shift and day shift work
 data.merged$group = rep(1,nrow(data.merged))
@@ -167,17 +164,18 @@ rm(batch2)
 # write.csv("")
 
 ##GEE
-data.merged = data.merged[order(data.merged$SW_Nr, data.merged$Probennahme_Dat, data.merged$Probennahme_Uhr),]
 rst = NULL
 for(i in valid_measures){
   subset = !is.na(data.merged[,i])
-  data.merged$m = scale(log(data.merged[,i]))
+  data.merged$m = log(data.merged[,i])
   if(sum(subset)>100& i!="Creatinine" & table(data.merged$group[subset])[1]!=0&
        table(data.merged$group[subset])[2]!=0){
-    model = gee(m ~ as.factor(group)+as.factor(SD) + Alter + BMI + AR_Rauch_zurzt  + as.factor(batch), # 
+    model = gee(m ~ as.factor(group)+ Alter + BMI + as.factor(AR_Rauch_zurzt) , # + as.factor(batch) +as.factor(SD)
                 id = SW_Nr, 
                 data = data.merged, 
-                subset = which(data.merged$Schichtdienst=="Tagschicht"&data.merged$SW_Nr!="SW1042"), #&data.merged$Alter>=45
+                subset = which(data.merged$Schichtdienst=="Tagschicht"&
+                                 data.merged$SW_Nr!="SW1041"&
+                                 data.merged$batch==1), #&data.merged$Alter>=45
                 na.action=na.omit, 
                # family = binomial,
                 corstr = "exchangeable"
@@ -189,14 +187,12 @@ for(i in valid_measures){
 rownames(rst) = valid_measures
 rst = data.frame(rst, p.value = 2*pnorm(-abs(rst[,5])))
 rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
-write.csv(rst, "Chronic effect of night shift work_GEE_daywork_age_BMI_smoking_exclude diab.csv")
+write.csv(rst, "Chronic effect of night shift work_GEE_daywork_age_BMI_smoking_exclude diab_batch1.csv")
 
 pdf("metabolite concentration between cases and controls.pdf", width =20, height=15)
 par(mfrow = c(5,10))
-for(i in measures)
-{
-  if(sum(!is.na(data.merged[,i])!=0))
-  {
+for(i in measures){
+  if(sum(!is.na(data.merged[,i])!=0)){
     plot(data.merged$group,data.merged[,i],log="y", main = paste(i, "case vs control"))
     plot(data.merged$Schichtdienst,data.merged[,i],log="y", main = paste(i, "day vs night"), col = "grey")
   }
@@ -207,3 +203,51 @@ for(i in measures)
 }
 dev.off()
 
+## Find differences between night shift and day shift work
+# Linear mixed effect model
+rst=NULL
+for(i in valid_measures){
+  subset = !is.na(data.merged[,i])
+  if(sum(subset)>10& i!="Creatinine"&
+       table(data.merged$Schichtdienst[subset])[1]!=0&
+       table(data.merged$Schichtdienst[subset])[2]!=0
+  ){
+    data.merged$m = scale(log(data.merged[,i]))
+    model = lme(m ~ Schichtdienst + Alter + BMI + AR_Rauch_zurzt+ as.factor(SD),
+                data.merged, 
+                subset = which(data.merged$group == 1),
+                random = ~ 1|SW_Nr/batch,
+                na.action=na.exclude
+    )
+    rst = rbind(rst, summary(model)$tTable[2,])
+  }
+  else rst = rbind(rst,rep(NA,5))
+}
+rownames(rst) = valid_measures
+rst = data.frame(rst)
+rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
+write.csv(rst, file = "Short term effect of night shift_mixed model_age_BMI_smoking_thyroid disease_meidcation_batch random.csv")
+
+##gee
+rst=NULL
+for(i in valid_measures){
+  subset = !is.na(data.merged[,i])
+  if(sum(subset)>10& i!="Creatinine"&
+       table(data.merged$Schichtdienst[subset])[1]!=0&
+       table(data.merged$Schichtdienst[subset])[2]!=0
+  ){
+    data.merged$m = scale(log(data.merged[,i]))
+    model = gee( m ~ Schichtdienst + Alter+ BMI + AR_Rauch_zurzt + as.factor(SD) + Plate.Bar.Code
+                 , id = SW_Nr
+                 , data = data.merged
+                 , subset = which(data.merged$group == 1)
+                 , na.action=na.omit 
+                 , corstr = "exchangeable"
+    )
+    rst = rbind(rst, summary(model)$coef[2,])
+  }
+  else rst = rbind(rst,rep(NA,5))
+}
+rownames(rst) = valid_measures
+rst = data.frame(rst, pvalue = 2*pnorm(-abs(rst[,5])))
+write.csv(rst, file = "Short term effect of night shift_GEE_age.csv")

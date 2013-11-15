@@ -19,6 +19,8 @@ samples.addition = read.csv("data/sample_additional infor.csv")
 samples = merge(samples, samples.addition, by.x = "SW_Nr", by.y = "P_ID")
 rm(samples.addition)
 
+measures = colnames(data)[(9:170)*2+1]
+
 ###################################################
 # Overall quality of the measurement
 # 1. Overall CV and within plate CV
@@ -27,6 +29,7 @@ rm(samples.addition)
 ###################################################
 index.ref = sapply(data$Sample.Identification, function(x) grep("Ref",x,fixed=T) )
 index.ref = sapply(index.ref, function(x) length(x)!=0)
+
 
 ##over all CV and within plate CV 
 rst=NULL
