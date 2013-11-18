@@ -14,38 +14,45 @@ dev.off()
 data.merged$Schichtdienst =factor(data.merged$Schichtdienst, levels = c("Tagschicht", "Nachtschicht"))
 data.merged = data.merged[order(data.merged$SW_Nr, data.merged$Probennahme_Dat, data.merged$Probennahme_Uhr),]
 
-data.merged$Probennahme_Uhr = sapply(data.merged$Probennahme_Uhr, function(x) return(x%%1/0.6+floor(x)))
+data.merged$Probennahme_Uhr = sapply(data.merged$Probennahme_Uhr, function(x) return(x*24))
+data.merged$Probennahme_Dat = as.character(data.merged$Probennahme_Dat)
 
 ### calculate the time interval between two samples
 data.merged$time_interval = 0
 for(i in 1:(nrow(data.merged)-1)){
+  
   if(data.merged$Probennahme_Uhr[i]<data.merged$Probennahme_Uhr[i+1]){
     data.merged$time_interval[i+1] = data.merged$Probennahme_Uhr[i+1]-data.merged$Probennahme_Uhr[i]
   }
   else data.merged$time_interval[i+1] = data.merged$Probennahme_Uhr[i+1]+24-data.merged$Probennahme_Uhr[i]
 }
 
-par(mfrow = c(3,3))
-for(p in data.merged$SW_Nr){
+
+pdf(paste("Nurse metabolite concentration cumulative all.pdf"), width = 60, height=160)
+par(mfcol = c(58,25))
+for(p in levels(data.merged$SW_Nr)){
   sample_person = which(data.merged$SW_Nr==p)
   tmp_person = data.merged[sample_person,]
-  nl = 0
-  for(day in unique(tmp_person$Probennahme_Dat)){
-    sample_day = which(data.merged$Probennahme_Dat[sample_person]==day)
-    tmp = tmp_person[sample_day,]
-    
-    tmp$Arg[which(is.na(tmp$Arg))] = mean(tmp$Arg, na.rm = T)
-    tmp$Arg = tmp$Arg*tmp$time_interval
-    
-    tmp.rst = cumsum(tmp$Arg)
-    if(nl==0){
-      plot(tmp.rst~ tmp$Probennahme_Uhr[which(tmp$Probennahme_Dat==day)], type = "b", xlim = c(0,24), ylim = range(0,100), main = "Arg", col = tmp$Schichtdienst[1])
+  for(m in valid_measures){
+    nl = 0
+    sums=tapply(tmp_person[,m]*tmp_person$time_interval, INDEX = tmp_person$Probennahme_Dat, sum, na.rm=T)
+    for(day in unique(tmp_person$Probennahme_Dat)){
+      sample_day = which(data.merged$Probennahme_Dat[sample_person]==day)
+      tmp = tmp_person[sample_day,]
+      
+      tmp[which(is.na(tmp[,m])),m] = mean(tmp[,m], na.rm = T)
+      tmp[,m] = tmp[,m]*tmp$time_interval
+      
+      tmp.rst = cumsum(tmp[,m])
+      if(nl==0){
+        plot(tmp.rst~ tmp$Probennahme_Uhr[which(tmp$Probennahme_Dat==day)], type = "b", xlim = c(0,24), ylim = range(0,max(sums)*1.5), main = m, col = tmp$Schichtdienst[1])
+      }
+      else points(tmp.rst~ tmp$Probennahme_Uhr[which(tmp$Probennahme_Dat==day)], type = "b", xlim = c(0,24), col = tmp$Schichtdienst[1])
+      nl = nl+1
     }
-    else points(tmp.rst~ tmp$Probennahme_Uhr[which(tmp$Probennahme_Dat==day)], type = "b", xlim = c(0,24), col = tmp$Schichtdienst[1])
-    
-    nl = nl+1
   }
 }
+dev.off()
 
 
 # index.person = match(samples$Proben_ID[which(samples$SW_Nr == "SW1030")], data$Sample.Identification)
@@ -132,6 +139,51 @@ pdf("Change over time in all samples.pdf", width =20, height=15)# Change over ti
 dev.off()
 
 
+## Compare the cumulative metabolite secretion in Urin
+tmp = data.merged
+
+data_columative = NULL
+for(i in valid_measures){
+  tmp[,i] = unlist(tapply(tmp[,i], INDEX=tmp$Probennahme_Dat, function(x) {x[which(is.na(x))]=mean(x, na.rm=T);return(x)}))
+  if(is.null(data_columative)) data_columative = aggregate(tmp[,i]*tmp$time_interval, by=list(tmp$SW_Nr, tmp$Probennahme_Dat), sum, na.rm=T)
+  else  data_columative = cbind(data_columative, aggregate(tmp[,i]*tmp$time_interval, by=list(tmp$SW_Nr, tmp$Probennahme_Dat), sum, na.rm=T)[,3])
+}
+colnames(data_columative) = c("SW_Nr", "Probennahme_Dat", valid_measures)
+
+data_columative = merge(data_columative, 
+          samples[!duplicated(samples[, c("SW_Nr", "Probennahme_Dat")]),]
+          )
+data_columative = merge(data_columative, samples.addition, by.x = "SW_Nr", by.y = "P_ID")
+data_columative = data_columative[order(data_columative$SW_Nr, data_columative$Probennahme_Dat),]
+
+rst = NULL
+for(i in valid_measures){
+  data_columative$m = data_columative[,i]
+  model = gee(m ~ as.factor(Kontrolle)+ Alter + BMI + as.factor(AR_Rauch_zurzt), # + as.factor(batch) +as.factor(SD)
+              id = SW_Nr, 
+              data = data_columative, 
+              subset = Schichtdienst=="Tagschicht"& SW_Nr!="SW1041", #&Alter>=45
+              na.action=na.omit, 
+              corstr = "exchangeable"
+  )
+  rst = rbind(rst, summary(model)$coef[2,])
+}
+rownames(rst) = valid_measures
+rst = data.frame(rst, p.value = 2*pnorm(-abs(rst[,5])))
+rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
+
+
+#   for(p in levels(tmp$SW_Nr)){
+#     sample_person = which(data.merged$SW_Nr==p)
+#     tmp_person = data.merged[sample_person,]
+#     for(m in valid_measures){
+#       nl = 0
+#       sums=tapply(tmp_person[,m]*tmp_person$time_interval, INDEX = tmp_person$Probennahme_Dat, sum, na.rm=T)
+#     }
+#   }
+}
+
+samples[!duplicated(samples[,c("Schichtdienst","SW_Nr")]), ]
 
 ## Find chronic effects of night shift and day shift work
 data.merged$group = rep(1,nrow(data.merged))

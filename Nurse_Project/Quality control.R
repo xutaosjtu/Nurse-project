@@ -66,7 +66,7 @@ aboveLOD = function(data){
 	
 	#rst.overLOD=apply(data[,measures],2, function(x) {x=rep(3*median(x[index.zero]),length(x)); return(x)})
 	rst.overLOD=apply(data[,measures],2, function(x) x>3*median(x[index.zero], na.rm = T))
-	return(rst.overLOD[index.nurse, ])
+	return(rst.overLOD[, ])
 }
 
 matrixLOD = data[,measures] # indicator matrix of measurements above LOD
