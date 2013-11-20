@@ -12,15 +12,16 @@ corrplot(cor(data.merged[,valid_measures], use = "pair"),col=col3(100), tl.col="
 dev.off()
 
 data.merged$Schichtdienst =factor(data.merged$Schichtdienst, levels = c("Tagschicht", "Nachtschicht"))
-data.merged = data.merged[order(data.merged$SW_Nr, data.merged$Probennahme_Dat, data.merged$Probennahme_Uhr),]
+data.merged = data.merged[order(data.merged$SW_Nr, data.merged$Probennahme_Dat, data.merged$Proben_Nr),]
 
-data.merged$Probennahme_Uhr = sapply(data.merged$Probennahme_Uhr, function(x) return(x*24))
+#data.merged$Probennahme_Uhr = sapply(data.merged$Probennahme_Uhr, function(x) return(x*24))
 data.merged$Probennahme_Dat = as.character(data.merged$Probennahme_Dat)
+data.merged$time = paste(data.merged$Probennahme_Dat, data.merged$Probennahme_Uhr)
+data.merged$time = strptime(data.merged$time, "%Y.%m.%d %H:%M")
 
 ### calculate the time interval between two samples
 data.merged$time_interval = 0
 for(i in 1:(nrow(data.merged)-1)){
-  
   if(data.merged$Probennahme_Uhr[i]<data.merged$Probennahme_Uhr[i+1]){
     data.merged$time_interval[i+1] = data.merged$Probennahme_Uhr[i+1]-data.merged$Probennahme_Uhr[i]
   }
@@ -222,12 +223,10 @@ for(i in valid_measures){
   data.merged$m = log(data.merged[,i])
   if(sum(subset)>100& i!="Creatinine" & table(data.merged$group[subset])[1]!=0&
        table(data.merged$group[subset])[2]!=0){
-    model = gee(m ~ as.factor(group)+ Alter + BMI + as.factor(AR_Rauch_zurzt) , # + as.factor(batch) +as.factor(SD)
+    model = gee(m ~ as.factor(group)+ Alter + BMI + as.factor(AR_Rauch_zurzt) + as.factor(batch) +as.factor(SD), #  
                 id = SW_Nr, 
                 data = data.merged, 
-                subset = which(data.merged$Schichtdienst=="Tagschicht"&
-                                 data.merged$SW_Nr!="SW1041"&
-                                 data.merged$batch==1), #&data.merged$Alter>=45
+                subset = Schichtdienst=="Tagschicht"& SW_Nr!="SW1041", #&data.merged$Alter>=45
                 na.action=na.omit, 
                # family = binomial,
                 corstr = "exchangeable"
@@ -239,7 +238,7 @@ for(i in valid_measures){
 rownames(rst) = valid_measures
 rst = data.frame(rst, p.value = 2*pnorm(-abs(rst[,5])))
 rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
-write.csv(rst, "Chronic effect of night shift work_GEE_daywork_age_BMI_smoking_exclude diab_batch1.csv")
+write.csv(rst, "Chronic effect of night shift work_GEE_daywork_age_BMI_smoking_disease_batch_exclude diab.csv")
 
 pdf("metabolite concentration between cases and controls.pdf", width =20, height=15)
 par(mfrow = c(5,10))
@@ -265,10 +264,10 @@ for(i in valid_measures){
        table(data.merged$Schichtdienst[subset])[2]!=0
   ){
     data.merged$m = scale(log(data.merged[,i]))
-    model = lme(m ~ Schichtdienst + Alter + BMI + AR_Rauch_zurzt+ as.factor(SD),
-                data.merged, 
+    model = lme(m ~ Schichtdienst + Alter + BMI + AR_Rauch_zurzt+ as.factor(SD)+as.factor(batch),
+                data.merged,
                 subset = which(data.merged$group == 1),
-                random = ~ 1|SW_Nr/batch,
+                random = ~ 1|SW_Nr,
                 na.action=na.exclude
     )
     rst = rbind(rst, summary(model)$tTable[2,])
@@ -277,8 +276,9 @@ for(i in valid_measures){
 }
 rownames(rst) = valid_measures
 rst = data.frame(rst)
+rst$Value = -rst$Value
 rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
-write.csv(rst, file = "Short term effect of night shift_mixed model_age_BMI_smoking_thyroid disease_meidcation_batch random.csv")
+write.csv(rst, file = "Short term effect of night shift_mixed model_age_BMI_smoking_disease_batch.csv")
 
 ##gee
 rst=NULL
