@@ -1,0 +1,198 @@
+Association between Hormone and metabolites
+========================================================
+
+1. Import hormone data
+-------------------------------
+```{r}
+load("data.RData")
+hormone = read.csv("data/Hormone data_sul.csv" )
+colnames(hormone)[10:12] = c("Melatonin", "Cortisol", "Estradiol")
+```
+
+```{r}
+hormone = hormone[order(hormone$SW_Nr, hormone$Probennahme_Dat, hormone$Proben_Nr),]
+hormone$Probennahme_Dat=as.character(hormone$Probennahme_Dat)
+```
+
+
+2. Categorize the sampling time, calculate the aggregated hormone levels and metabolite concentrations at different time intervals 
+-------------------------------
+### 2.1 set the samplying time intervals (0:00:00~8:00:00, 8:00:00~16:00:00, 16:00:00~ 24:00:00)
+```{r}
+hormone$hour = strptime(hormone$Probennahme_Uhr, "%H:%M")
+hormone$hour_cut = cut(hormone$hour, breaks = strptime(c("0:00:00","8:00:00", "16:00:00", "23:59:59"), "%H:%M:%S"))
+
+data.merged$hour = strptime(data.merged$Probennahme_Uhr, "%H:%M")
+data.merged$hour_cut = cut(data.merged$hour, breaks = strptime(c("0:00:00","8:00:00", "16:00:00", "23:59:59"), "%H:%M:%S"))
+metabo = data.merged
+
+```
+
+### 2.2 Aggregate the metabolite concentration according to the time intervales
+```{r}
+metabo[, valid_measures] = scale(log(metabo[, valid_measures]))
+metabo_aggre = aggregate(metabo[,valid_measures], by=list(metabo$SW_Nr, metabo$hour_cut,metabo$Probennahme_Dat, metabo$Schichtdienst), mean, na.rm=T)
+colnames(metabo_aggre)[1:4]=c("SW_Nr","hour", "date", "shift")
+
+hormone[, c("Melatonin", "Cortisol", "Estradiol")] = scale(log(hormone[, c("Melatonin", "Cortisol", "Estradiol")]))
+hormone_aggre = aggregate(hormone[, c("Melatonin","Cortisol","Estradiol")], by=list(hormone$SW_Nr, hormone$hour_cut, hormone$Probennahme_Dat, hormone$Schichtdienst), mean, na.rm=T)
+colnames(hormone_aggre)[1:4]=c("SW_Nr","hour", "date", "shift")
+```
+
+### 2.3 Match the metabolite samples with the hormone samples
+```{r}
+match_metabo_hormone = merge(metabo_aggre, hormone_aggre)
+match_metabo_hormone = match_metabo_hormone[order(match_metabo_hormone$SW_Nr, match_metabo_hormone$date, match_metabo_hormone$hour),]
+```
+
+3. Correlation analysis between metabolite concentrations and hormone levels.
+------------------------------
+```{r comment='heatmap of correlation between metabolites and hormorns'}
+require(corrplot)
+getwd()
+pdf("TEMP/correlation between metabolite with hormones.pdf", width = 20, height=20)
+#col1 = colorRampPalette(c("#053061","#2166AC","#4393C3","#92C5DE", "#D1E5F0", "#FFFFFF", "#FDDBC7","#F4A582","#D6604D", "#B2182B",  "#67001F"))  
+corrplot(cor(match_metabo_hormone[,-c(1:4)], use="pair"), tl.col = "black")
+dev.off()
+```
+
+4. Analyze the metabolite secretion rate in categorized time intervals.
+------------------------------
+### 4.1 Estimate the association between hormone and metabolites in linear mixed effect model
+```{r}
+require(nlme)
+rst = NULL
+for(i in valid_measures){
+  match_metabo_hormone$m = match_metabo_hormone[,i]
+  model = lme(m~ Melatonin + Cortisol + Estradiol, data = match_metabo_hormone, random = ~1|SW_Nr, na.action = na.omit)
+  tmp = summary(model)$tTable
+  rst = rbind(rst, c(tmp[1,], tmp[2, ], tmp[3,]))
+}
+rownames(rst) = valid_measures
+write.csv(rst, "TEMP/association between metabolites and hormones_lme.csv")
+```
+
+### 4.2 Analyze the metabolite secretion rate in categorized time intervals.
+#### 4.2.1 Adding personal characteristics information to the metabolite dataset
+```{r}
+metabo_aggre = merge(metabo_aggre, samples.addition, by.x = "SW_Nr", by.y = "P_ID")
+metabo_aggre = metabo_aggre[order(metabo_aggre$SW_Nr, metabo_aggre$date, metabo_aggre$hour),]
+levels(metabo_aggre$Kontrolle)=c("case", "control")
+```
+
+#### 4.2.2 Investigate the differences of metabolite profile between case and control group in the day shift work
+```{r warning=FALSE, message=FALSE, results='hide'}
+require(gee)
+rst = NULL
+
+for(i in valid_measures){
+  metabo_aggre$m = metabo_aggre[,i]
+   model = suppressMessages(
+      gee(m ~ as.factor(Kontrolle)+ Alter + BMI + as.factor(AR_Rauch_zurzt)+as.factor(SD), 
+                id = SW_Nr, 
+                data = metabo_aggre, 
+                subset = shift=="Tagschicht"& SW_Nr!="SW1041",
+                na.action=na.omit, 
+                corstr = "exchangeable"
+                  )
+      )
+    rst = rbind(rst, summary(model)$coef[2,])
+}
+rownames(rst) = valid_measures
+rst = data.frame(rst, p.value = 2*pnorm(-abs(rst[,5])))
+rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
+rst$Estimate = -rst$Estimate
+write.csv(rst, "TEMP/categorized time_Chronic effect of night shift work_GEE_daywork_age_BMI_smoking_disease_exclude diab.csv")
+
+```
+
+#### 4.2.3 Investigate the differences of metabolite profile between day shift work and night shift work in the case group
+```{r}
+require(nlme)
+rst=NULL
+for(i in valid_measures){
+  metabo_aggre$m = metabo_aggre[,i]
+  model = lme(m ~ shift + Alter + BMI + as.factor(AR_Rauch_zurzt) + as.factor(SD),
+              metabo_aggre,
+                subset = Kontrolle=="case" & SW_Nr!="SW1041",
+                random = ~ 1|SW_Nr,
+                na.action=na.omit
+  )
+  rst = rbind(rst, summary(model)$tTable[2,])
+}
+rownames(rst) = valid_measures
+rst = data.frame(rst)
+rst$Value = -rst$Value
+rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
+write.csv(rst, file = "TEMP/categorized time_Short term effect of night shift_mixed model_age_BMI_smoking_disease.csv")
+```
+
+#### 4.2.4 Plot of the metabolite concentrations in different sampling time intervals
+```{r fig.height=9, fig.width=9, warning=FALSE}
+require(ggplot2)
+require(grid)
+
+pdf("TEMP/metabolite concentration at different time period of the day.pdf", width = 30, height = 20)
+k=1;nrow=1;ncol=1;newp=F
+pushViewport(viewport(layout = grid.layout(3, 3)))
+for(i in valid_measures){
+  metabo_aggre$m = metabo_aggre[,i]
+  
+  p = ggplot(metabo_aggre, aes(hour, m))
+  p = p + geom_boxplot(aes(fill=interaction(factor(Kontrolle), factor(shift))))+ggtitle(i)
+  
+  print(p, vp = viewport(layout.pos.row = nrow, layout.pos.col = ncol))
+  if(ncol==3 & nrow==3) {
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(3, 3)))
+  }
+  if(k<9) {
+    if(k%%3==0) nrow=nrow+1
+    k = k+1
+    ncol = k-3*(nrow-1)
+  }
+  else {
+    k=1
+    nrow = 1
+    ncol = 1
+  }
+    
+}
+dev.off()
+
+p = ggplot(match_metabo_hormone, aes(x = Cortisol, y = C0, group = shift, col =factor(shift)))
+p + geom_point() + geom_smooth()# + geom_line(aes(y = Cortisol), col="red")
+```
+
+#### 4.2.5 Plot correlation between metabolites and Cortisol
+```{r warning=FALSE}
+pdf("TEMP/metabolite correlation with Cortisol.pdf", width = 20, height = 20)
+k=1;nrow=1;ncol=1;newp=F
+pushViewport(viewport(layout = grid.layout(3, 3)))
+for(i in valid_measures){
+  match_metabo_hormone$m = match_metabo_hormone[,i]
+  
+  ##change the code here if plot some thing else
+  p = ggplot(match_metabo_hormone, aes(x = Cortisol, y = m))
+  p = p + geom_point() + geom_smooth(method = "lm")+ggtitle(i)
+  ##
+  
+  print(p, vp = viewport(layout.pos.row = nrow, layout.pos.col = ncol))
+  if(ncol==3 & nrow==3) {
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(3, 3)))
+  }
+  if(k<9) {
+    if(k%%3==0) nrow=nrow+1
+    k = k+1
+    ncol = k-3*(nrow-1)
+  }
+  else {
+    k=1
+    nrow = 1
+    ncol = 1
+  }
+  
+}
+dev.off()
+```
