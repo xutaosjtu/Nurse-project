@@ -9,7 +9,7 @@
 setwd("D:/Users/tao.xu/Dropbox/Nurse project/")
 
 #data = read.csv("data/2013-04-10_Conc_Rui_Rabstein_Urin_normalisiert.csv")
-#data = read.csv("data/2013-04-10_Conc_Rui_Rabstein_Urin.csv")
+#data = read.csv("data/original data/2013-04-10_Conc_Rui_Rabstein_Urin.csv")
 data = read.csv("data/Urin data_all samples.csv")
 #data= data[-c(1:),]
 #samples = read.csv("data/2013-01-31 Helmholtz.csv")
@@ -121,6 +121,8 @@ index.spin = sapply(index.spin, function(x) length(x)!=0)
 index.unspin = sapply(data$Sample.Identification, function(x) grep("PX",x,fixed=T) )
 index.unspin = sapply(index.unspin, function(x) length(x)!=0)
 
+data = normalize(data,measures)
+
 measures = colnames(rst)
 rst.difference = apply(data[,measures], 2, function(x) t.test(x[index.spin],x[index.unspin],paired=T)) ## t-test
 rst = NULL #differences between spin and unspined samples
@@ -134,11 +136,11 @@ rownames(rst) = measures
 colnames(rst) = c("mean of difference","2.5%","97.5%","p-value")
 write.csv(rst, "differences between spin and unspin.csv")
 
-pdf("spin and unspined2.pdf", width = 15, height=15) # scatter plot to show trends of meatbolites 
+pdf("spin and unspined.pdf", width = 15, height=15) # scatter plot to show trends of meatbolites 
 par(mfrow=c(5,5))
 for(i in measures){
-	plot(data[index.spin,i], type ="b", ylim = range(data[c(index.spin|index.unspin),i]), main = i)
-	points(data[index.unspin,i], type ="b", col = "red")
+	plot(data[index.spin,i][2:8], type ="b", ylim = range(data[c(index.spin|index.unspin),i][c(-1,-9)]), main = i, col = "red")
+	points(data[index.unspin,i][2:8], type ="b", col = "blue")
 }
 dev.off()
 #[2:8][c(-1,-9)]
