@@ -240,3 +240,21 @@ for(i in valid_measures){
   
 }
 dev.off()
+
+
+metabo_aggre$hour2 = metabo_aggre$hour
+for(p in levels(metabo_aggre$SW_Nr)){
+  for(sh in levels(metabo_aggre$shift)){
+    subset = which(metabo_aggre$SW_Nr==p& metabo_aggre$shift==sh)
+    a = metabo_aggre[subset, 3]
+    metabo_aggre$hour2[subset] = metabo_aggre$hour2[subset]+as.numeric(a-a[1])
+  }
+}
+metabo_aggre$hour2 = as.character(metabo_aggre$hour2)
+
+metabo_aggre$date2 = sapply(metabo_aggre$hour2, function(x) strsplit(x, split = " ")[[1]][1])
+
+p = ggplot(metabo_aggre, aes(hour2, m))
+p = p + geom_boxplot( aes(fill=interaction(factor(date2), factor(Kontrolle))) ) + ggtitle(i)
+p = p + facet_grid(shift~.)
+
