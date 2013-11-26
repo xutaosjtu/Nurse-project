@@ -19,7 +19,7 @@ hormone$Probennahme_Dat=as.character(hormone$Probennahme_Dat)
 
 2. Categorize the sampling time, calculate the aggregated hormone levels and metabolite concentrations at different time intervals 
 -------------------------------
-### 2.1 set the samplying time intervals (0:00:00~8:00:00, 8:00:00~16:00:00, 16:00:00~ 24:00:00)
+### 2.1 set the samplying time intervals (0:00~3:00, 3:00-6:00, 6:00~9:00, 9:00:00~ 12:00:00, 12:00~15:00, 15:00~18:00, 18:00~21:00, 21:00~23:59)
 ```{r}
 hormone$hour = strptime(hormone$Probennahme_Uhr, "%H:%M")
 hormone$hour_cut = cut(hormone$hour, breaks = strptime(c("0:00:00","8:00:00", "16:00:00", "23:59:59"), "%H:%M:%S"))
@@ -108,10 +108,10 @@ rst = NULL
 for(i in valid_measures){
   metabo_aggre$m = metabo_aggre[,i]
    model = suppressMessages(
-      gee(m ~ as.factor(Kontrolle)+ Alter + BMI + as.factor(AR_Rauch_zurzt)+as.factor(SD), 
+      gee(m ~ as.factor(Kontrolle)+ Alter + BMI + as.factor(AR_Rauch_zurzt)+as.factor(SD),
                 id = SW_Nr, 
                 data = metabo_aggre, 
-                subset = shift=="Tagschicht"& SW_Nr!="SW1041",
+                subset = shift=="Tagschicht"& SW_Nr!="SW1041"& Alter>45,
                 na.action=na.omit, 
                 corstr = "exchangeable"
                   )
@@ -122,7 +122,7 @@ rownames(rst) = valid_measures
 rst = data.frame(rst, p.value = 2*pnorm(-abs(rst[,5])))
 rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
 rst$Estimate = -rst$Estimate
-write.csv(rst, "TEMP/categorized time_Chronic effect of night shift work_GEE_daywork_age_BMI_smoking_disease_exclude diab.csv")
+write.csv(rst, "TEMP/categorized time_3h_Chronic effect of night shift work_GEE_daywork_age_BMI_smoking_thyroid_exclude diab_over 45.csv")
 
 ```
 
@@ -144,7 +144,7 @@ rownames(rst) = valid_measures
 rst = data.frame(rst)
 rst$Value = -rst$Value
 rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjust(rst$p.value, method = "bonf"))
-write.csv(rst, file = "TEMP/categorized time_Short term effect of night shift_mixed model_age_BMI_smoking_disease.csv")
+write.csv(rst, file = "TEMP/categorized time_3h_Short term effect of night shift_mixed model_age_BMI_smoking_disease.csv")
 ```
 
 #### 4.2.4 Plot of the metabolite concentrations in different sampling time intervals
@@ -152,15 +152,19 @@ write.csv(rst, file = "TEMP/categorized time_Short term effect of night shift_mi
 require(ggplot2)
 require(grid)
 
-pdf("TEMP/metabolite concentration at different time period of the day while day or night shift_group.pdf", width = 30, height = 20)
+pdf("TEMP/metabolite concentration comparing day and night shift_both group_over 45.pdf", width = 30, height = 20)
 k=1;nrow=1;ncol=1;newp=F
 pushViewport(viewport(layout = grid.layout(3, 3)))
 for(i in valid_measures){
   metabo_aggre$m = metabo_aggre[,i]
   
-  p = ggplot(metabo_aggre, aes(hour2, m))
-  p = p + geom_boxplot( aes(fill=interaction(factor(date2), factor(Kontrolle)) ) ) + ggtitle(i)
-  p = p + facet_grid(shift~.)
+#   p = ggplot(metabo_aggre, aes(hour2, m))
+#   p = p + geom_boxplot( aes(fill=interaction(factor(date2), factor(Kontrolle)) ) ) + ggtitle(i)
+#   p = p + facet_grid(shift~.)
+  
+  tmp = metabo_aggre[which(metabo_aggre$Kontrolle=="Night"),]
+  p = ggplot(tmp, aes(hour2, m))
+  p = p + geom_boxplot( aes(fill=interaction(factor(date2), factor(shift)) ) ) + ggtitle(i)
 
   print(p, vp = viewport(layout.pos.row = nrow, layout.pos.col = ncol))
   if(ncol==3 & nrow==3) {
