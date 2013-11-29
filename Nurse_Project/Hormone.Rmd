@@ -21,11 +21,13 @@ hormone$Probennahme_Dat=as.character(hormone$Probennahme_Dat)
 -------------------------------
 ### 2.1 set the samplying time intervals (0:00~3:00, 3:00-6:00, 6:00~9:00, 9:00:00~ 12:00:00, 12:00~15:00, 15:00~18:00, 18:00~21:00, 21:00~23:59)
 ```{r}
-hormone$hour = strptime(hormone$Probennahme_Uhr, "%H:%M:%S")
-hormone$Probennahme_Dat = strptime(hormone$Probennahme_Dat, "%Y.%m.%d")
 hormone$Probennahme_Uhr = as.character(hormone$Probennahme_Uhr)
-hormone$Probennahme_Uhr = strptime(hormone$Probennahme_Uhr, "%H:%M")
-hormone$hour_cut = cut(hormone$hour, breaks = strptime((c("0:00:00", "3:00:00", "6:00:00", "9:00:00", "12:00:00","15:00:00","18:00:00","21:00:00","23:59:59"), "%H:%M:%S"))
+hormone$hour = strptime(hormone$Probennahme_Uhr, "%H:%M")
+#hormone$Probennahme_Dat = strptime(hormone$Probennahme_Dat, "%Y.%m.%d")
+#hormone$Probennahme_Dat = as.character(hormone$Probennahme_Dat)
+#hormone$Probennahme_Uhr = as.character(hormone$Probennahme_Uhr)
+#hormone$Probennahme_Uhr = strptime(hormone$Probennahme_Uhr, "%H:%M")
+hormone$hour_cut = cut(hormone$hour, breaks = strptime(c("0:00:00", "3:00:00", "6:00:00", "9:00:00", "12:00:00","15:00:00","18:00:00","21:00:00","23:59:59"), "%H:%M:%S"))
 
 data.merged$hour = strptime(data.merged$Probennahme_Uhr, "%H:%M")
 data.merged$hour_cut = cut(data.merged$hour, 
