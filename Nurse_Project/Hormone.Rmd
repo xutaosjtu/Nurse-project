@@ -30,8 +30,7 @@ hormone$hour = strptime(hormone$Probennahme_Uhr, "%H:%M")
 hormone$hour_cut = cut(hormone$hour, breaks = strptime(c("0:00:00", "3:00:00", "6:00:00", "9:00:00", "12:00:00","15:00:00","18:00:00","21:00:00","23:59:59"), "%H:%M:%S"))
 
 data.merged$hour = strptime(data.merged$Probennahme_Uhr, "%H:%M")
-data.merged$hour_cut = cut(data.merged$hour, 
-                           breaks = strptime(c("0:00:00", "3:00:00", "6:00:00", "9:00:00", "12:00:00","15:00:00","18:00:00","21:00:00","23:59:59"), "%H:%M:%S"))
+data.merged$hour_cut = cut(data.merged$hour, breaks = strptime(c("0:00:00", "3:00:00", "6:00:00", "9:00:00", "12:00:00","15:00:00","18:00:00","21:00:00","23:59:59"), "%H:%M:%S"))
 metabo = data.merged
 
 ```
@@ -81,7 +80,7 @@ write.csv(rst, "TEMP/association between metabolites and hormones_lme.csv")
 ```
 
 ### 4.2 Analyze the metabolite secretion rate in categorized time intervals.
-#### 4.2.1 Adding personal characteristics information to the metabolite dataset
+#### 4.2.1.1 Adding personal characteristics information to the metabolite dataset
 ```{r}
 metabo_aggre = merge(metabo_aggre, samples.addition, by.x = "SW_Nr", by.y = "P_ID")
 metabo_aggre$date = strptime(metabo_aggre$date, "%Y.%m.%d")
@@ -103,6 +102,30 @@ metabo_aggre$date2 = as.factor(metabo_aggre$date2)
 levels(metabo_aggre$date2) = c("day1","day2", "day3", "day4", "day5")
 
 levels(metabo_aggre$Kontrolle)=c("Night", "Day")
+```
+
+#### 4.2.1.2 Adding personal characteristics information to the hormon data
+```{r}
+hormone_aggre = merge(hormone_aggre, samples.addition, by.x = "SW_Nr", by.y = "P_ID")
+hormone_aggre$date = strptime(hormone_aggre$date, "%Y.%m.%d")
+hormone_aggre$hour = strptime(hormone_aggre$hour, "%Y-%m-%d %H:%M:%S")
+hormone_aggre = hormone_aggre[order(hormone_aggre$SW_Nr, hormone_aggre$date, hormone_aggre$hour),]
+
+hormone_aggre$hour2 = hormone_aggre$hour
+for(p in levels(hormone_aggre$SW_Nr)){
+  for(sh in levels(hormone_aggre$shift)){
+    subset = which(hormone_aggre$SW_Nr==p & hormone_aggre$shift==sh)
+    a = hormone_aggre[subset, 3]
+    hormone_aggre$hour2[subset] = hormone_aggre$hour2[subset] + as.numeric(a-a[1])
+  }
+}
+hormone_aggre$hour2 = as.character(hormone_aggre$hour2)
+
+hormone_aggre$date2 = sapply(hormone_aggre$hour2, function(x) strsplit(x, split=" ")[[1]][1])
+hormone_aggre$date2 = as.factor(hormone_aggre$date2)
+levels(hormone_aggre$date2)=c("day1", "day2", "day3", "day4", "day5")
+
+levels(hormone_aggre$Kontrolle)=c("Night", "Day")
 ```
 
 #### 4.2.2 Investigate the differences of metabolite profile between case and control group in the day shift work
@@ -152,12 +175,12 @@ rst = data.frame(rst, fdr = p.adjust(rst$p.value, method = "BH"), bonf = p.adjus
 write.csv(rst, file = "TEMP/categorized time_3h_Short term effect of night shift_mixed model_age_BMI_smoking_disease.csv")
 ```
 
-#### 4.2.4 Plot of the metabolite concentrations in different sampling time intervals
+#### 4.2.4.1 Plot of the metabolite concentrations in different sampling time intervals
 ```{r fig.height=5, fig.width=9, warning=FALSE}
 require(ggplot2)
 require(grid)
 
-pdf("TEMP/metabolite concentration comparing day and night shift_both group_over 45.pdf", width = 30, height = 20)
+pdf("TEMP/metabolite concentration at different time sections of the day.pdf", width = 30, height = 20)
 k=1;nrow=1;ncol=1;newp=F
 pushViewport(viewport(layout = grid.layout(3, 3)))
 for(i in valid_measures){
@@ -167,9 +190,50 @@ for(i in valid_measures){
 #   p = p + geom_boxplot( aes(fill=interaction(factor(date2), factor(Kontrolle)) ) ) + ggtitle(i)
 #   p = p + facet_grid(shift~.)
   
-  tmp = metabo_aggre[which(metabo_aggre$Kontrolle=="Night"),]
+  tmp = metabo_aggre
   p = ggplot(tmp, aes(hour2, m))
-  p = p + geom_boxplot( aes(fill=interaction(factor(date2), factor(shift)) ) ) + ggtitle(i)
+  p = p + geom_boxplot( aes(fill=interaction(factor(date2)) ) ) + ggtitle(i)
+  p = p + facet_grid(shift+Kontrolle~. )
+
+  print(p, vp = viewport(layout.pos.row = nrow, layout.pos.col = ncol))
+  if(ncol==3 & nrow==3) {
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(3, 3)))
+  }
+  if(k<9) {
+    if(k%%3==0) nrow=nrow+1
+    k = k+1
+    ncol = k-3*(nrow-1)
+  }
+  else {
+    k=1
+    nrow = 1
+    ncol = 1
+  }
+    
+}
+dev.off()
+```
+
+#### 4.2.4.2 Plot of the hormone levels in different sampling time intervals
+```{r fig.height=5, fig.width=9, warning=FALSE}
+require(ggplot2)
+require(grid)
+
+pdf("TEMP/hormone levels comparing day and night shift_both group.pdf", width = 30, height = 20)
+k=1;nrow=1;ncol=1;newp=F
+pushViewport(viewport(layout = grid.layout(3, 3)))
+for(i in c("Melatonin","Cortisol","Estradiol")){
+  hormone_aggre$m = hormone_aggre[,i]
+  
+#   p = ggplot(metabo_aggre, aes(hour2, m))
+#   p = p + geom_boxplot( aes(fill=interaction(factor(date2), factor(Kontrolle)) ) ) + ggtitle(i)
+#   p = p + facet_grid(shift~.)
+  
+  tmp = hormone_aggre
+  p = ggplot(tmp, aes(hour2, m))
+  p = p + geom_boxplot( aes(fill=interaction(factor(date2)) ) ) + ggtitle(i)
+  p = p + facet_grid(shift+Kontrolle~. )
 
   print(p, vp = viewport(layout.pos.row = nrow, layout.pos.col = ncol))
   if(ncol==3 & nrow==3) {
