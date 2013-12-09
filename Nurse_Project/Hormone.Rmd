@@ -180,21 +180,28 @@ write.csv(rst, file = "TEMP/categorized time_3h_Short term effect of night shift
 require(ggplot2)
 require(grid)
 
-pdf("TEMP/metabolite concentration at different time sections of the day.pdf", width = 30, height = 20)
+pdf("TEMP/metabolite concentration at different time sections of the day_individual.pdf", width = 30, height = 20)
 k=1;nrow=1;ncol=1;newp=F
 pushViewport(viewport(layout = grid.layout(3, 3)))
 for(i in valid_measures){
-  metabo_aggre$m = metabo_aggre[,i]
   
-#   p = ggplot(metabo_aggre, aes(hour2, m))
-#   p = p + geom_boxplot( aes(fill=interaction(factor(date2), factor(Kontrolle)) ) ) + ggtitle(i)
-#   p = p + facet_grid(shift~.)
-  
-  tmp = metabo_aggre
-  p = ggplot(tmp, aes(hour2, m))
-  p = p + geom_boxplot( aes(fill=interaction(factor(date2)) ) ) + ggtitle(i)
-  p = p + facet_grid(shift+Kontrolle~. )
+#   metabo_aggre$m = metabo_aggre[,i]
+#   
+#   tmp = subset(metabo_aggre, shift=="Tagschicht")
+#    p = ggplot(tmp, aes(as.character(hour), m))
+#    p = p + geom_boxplot( aes(fill=factor(Kontrolle) ) )+scale_fill_manual(values = c("pink","red")) + ggtitle(i) +scale_y_continuous(limits = c(-4, 3.5))
+#    p = p + facet_grid(.~date2)
+#   
+#   tmp = metabo_aggre
+#   p = ggplot(tmp, aes(as.character(hour), m))
+#   p = p + geom_boxplot( aes(fill=interaction(factor(date2)) ) ) + ggtitle(i)
+#   p = p + facet_grid(shift+Kontrolle~date2 )
 
+  metabo$m = metabo[,i]
+  p = ggplot(subset(metabo, !is.na(m)), aes(hour, m, group = SW_Nr))
+  p = p + geom_line() + geom_point() +ggtitle(i)
+  p = p + facet_grid(Schichtdienst+Kontrolle ~ date2)
+  
   print(p, vp = viewport(layout.pos.row = nrow, layout.pos.col = ncol))
   if(ncol==3 & nrow==3) {
     grid.newpage()
@@ -236,11 +243,16 @@ levels(metabo$date2)=c("day1", "day2", "day3", "day4", "day5")
 
 pdf("example_SW1030_in one day.pdf", width = 5, height = 3)
 metabo$m = metabo[,i]
-p = ggplot(subset(metabo, SW_Nr %in% c("SW1030")), aes(hour, m), subset())
+p = ggplot(subset(metabo, SW_Nr %in% c("SW1030")& !is.na(m)), aes(hour, m))
 p = p + geom_line(aes(linetype = Probennahme_Dat)) + geom_point(aes(col = factor(Schichtdienst))) +scale_colour_manual(values = c("blue","red")) +ggtitle("C12:1")
 p
 dev.off()
 
+metabo$m = metabo[,i]
+p = ggplot(subset(metabo, !is.na(m)), aes(hour, m, group = SW_Nr))
+p = p + geom_line() + geom_point() +ggtitle(i)
+p = p + facet_grid(Schichtdienst+Kontrolle ~ date2)
+p
 
 ```
 
@@ -260,9 +272,10 @@ for(i in c("Melatonin","Cortisol","Estradiol")){
 #   p = p + facet_grid(shift~.)
   
   tmp = hormone_aggre
-  p = ggplot(tmp, aes(hour2, m))
-  p = p + geom_boxplot( aes(fill=interaction(factor(date2)) ) ) + ggtitle(i)
-  p = p + facet_grid(shift+Kontrolle~. )
+  p = ggplot(tmp, aes(as.character(hour), m, group = SW_Nr))
+  p = p + geom_point() + geom_line()
+#  p = p + geom_boxplot() + ggtitle(i) #geom_boxplot( aes(fill=interaction(factor(date2)) ) )
+  p = p + facet_grid(shift+Kontrolle~ date2)
 
   print(p, vp = viewport(layout.pos.row = nrow, layout.pos.col = ncol))
   if(ncol==3 & nrow==3) {
