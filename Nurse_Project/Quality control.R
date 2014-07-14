@@ -63,10 +63,10 @@ aboveLOD = function(data){
 	index.zero = (data$Sample.Type=="Zero Sample")
 	index.nurse = sapply(data$Sample.Identification, function(x) grep("SW",x,fixed=T) )
 	index.nurse = sapply(index.nurse, function(x) length(x)!=0)
-	
+	print(sum(index.nurse))
 	#rst.overLOD=apply(data[,measures],2, function(x) {x=rep(3*median(x[index.zero]),length(x)); return(x)})
 	rst.overLOD=apply(data[,measures],2, function(x) x>3*median(x[index.zero], na.rm = T))
-	return(rst.overLOD[, ])
+	return(rst.overLOD[index.nurse, ])
 }
 
 matrixLOD = data[,measures] # indicator matrix of measurements above LOD
@@ -82,7 +82,8 @@ rst=NULL # measurements above LOD in each plate and all plates
 for(i in names(table(data$Plate.Bar.Code))){
 	subset = which(data$Plate.Bar.Code == i)
 	tmp = aboveLOD(data[subset,])
-	rst = cbind(rst,apply(tmp,2,sum, na.rm = T))
+  print(nrow(tmp))
+	rst = cbind(rst,apply(tmp , 2, sum, na.rm = T))
 }
 colnames(rst) = names(table(data$Plate.Bar.Code))
 rst = data.frame(rst, overall = apply(rst,1,sum))

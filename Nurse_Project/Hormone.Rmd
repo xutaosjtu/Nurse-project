@@ -40,10 +40,15 @@ metabo = data.merged
 metabo[, valid_measures] = scale(log(metabo[, valid_measures]))
 metabo_aggre = aggregate(metabo[,valid_measures], by=list(metabo$SW_Nr, metabo$hour_cut,metabo$Probennahme_Dat, metabo$Schichtdienst), mean, na.rm=T)
 colnames(metabo_aggre)[1:4]=c("SW_Nr","hour", "date", "shift")
+metabo_aggre$hour = as.character(metabo_aggre$hour)
+metabo_aggre$hour = sapply(metabo_aggre$hour, function(x) return(strsplit(x, split = " ", fixed=T)[[1]][2]))
 
 hormone[, c("Melatonin", "Cortisol", "Estradiol")] = scale(log(hormone[, c("Melatonin", "Cortisol", "Estradiol")]))
 hormone_aggre = aggregate(hormone[, c("Melatonin","Cortisol","Estradiol")], by=list(hormone$SW_Nr, hormone$hour_cut, hormone$Probennahme_Dat, hormone$Schichtdienst), mean, na.rm=T)
 colnames(hormone_aggre)[1:4]=c("SW_Nr","hour", "date", "shift")
+hormone_aggre$hour = as.character(hormone_aggre$hour)
+hormone_aggre$hour = sapply(hormone_aggre$hour, function(x) return(strsplit(x, split = " ", fixed=T)[[1]][2]))
+
 ```
 
 ### 2.3 Match the metabolite samples with the hormone samples
@@ -59,7 +64,7 @@ require(corrplot)
 getwd()
 pdf("TEMP/correlation between metabolite with hormones.pdf", width = 20, height=20)
 #col1 = colorRampPalette(c("#053061","#2166AC","#4393C3","#92C5DE", "#D1E5F0", "#FFFFFF", "#FDDBC7","#F4A582","#D6604D", "#B2182B",  "#67001F"))  
-corrplot(cor(match_metabo_hormone[,-c(1:4)], use="pair"), tl.col = "black")
+corrplot(cor(match_metabo_hormone[,-c(1:4)], use="pair", method = "spearman"), tl.col = "black")
 dev.off()
 ```
 
@@ -71,13 +76,15 @@ require(nlme)
 rst = NULL
 for(i in valid_measures){
   match_metabo_hormone$m = match_metabo_hormone[,i]
-  model = lme(m~ Melatonin + Cortisol + Estradiol, data = match_metabo_hormone, random = ~1|SW_Nr, na.action = na.omit)
+  model = lme(m~  Estradiol , data = match_metabo_hormone, random = ~1|SW_Nr, na.action = na.omit)
   tmp = summary(model)$tTable
-  rst = rbind(rst, c(tmp[1,], tmp[2, ], tmp[3,]))
+  rst = rbind(rst, tmp[2,])
 }
 rownames(rst) = valid_measures
-write.csv(rst, "TEMP/association between metabolites and hormones_lme.csv")
+write.csv(rst, "TEMP/association between metabolites and Estradiol _lme.csv")
 ```
+
+Melatonin+ Cortisol + Estradiol
 
 ### 4.2 Analyze the metabolite secretion rate in categorized time intervals.
 #### 4.2.1.1 Adding personal characteristics information to the metabolite dataset
